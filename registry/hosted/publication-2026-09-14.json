@@ -1,0 +1,72 @@
+{
+  "checkedAt": "2026-09-14T14:52:35.323420+00:00",
+  "metadataCommit": "5e0b7cd707ddf90bc9015c5c83946f9c46cdb564",
+  "tag": "registry-hosted-v0.1.1",
+  "workflow": "https://github.com/ipvolt/proxy-toolkit-mcp/actions/runs/34858211777",
+  "url": "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.ipvolt%2Fproxy-toolkit/versions/0.1.1",
+  "manifestSha256": "c69c3ddc2472e895ede2130797e8ec36370686ca41a6ce0ab932bbc67063a3b1",
+  "npmVersionUnchanged": "0.1.0",
+  "npmArchiveSha256": "4848d77611d09a004454577e9a2f3316c420bcbca3a33633ae8a43876ec48f81",
+  "previousVersionUnchangedAndActive": true,
+  "previousVersionLatest": false,
+  "published": {
+    "server": {
+      "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+      "name": "io.github.ipvolt/proxy-toolkit",
+      "description": "Proxy guides, tested configurations and error diagnostics, with an optional local route check.",
+      "title": "ipvolt Proxy Toolkit",
+      "repository": {
+        "url": "https://github.com/ipvolt/proxy-toolkit-mcp",
+        "source": "github"
+      },
+      "version": "0.1.1",
+      "websiteUrl": "https://ipvolt.com",
+      "packages": [
+        {
+          "registryType": "npm",
+          "registryBaseUrl": "https://registry.npmjs.org",
+          "identifier": "@ipvolt/proxy-toolkit-mcp",
+          "version": "0.1.0",
+          "runtimeHint": "npx",
+          "transport": {
+            "type": "stdio"
+          },
+          "environmentVariables": [
+            {
+              "description": "Optional local route diagnostic. Set 1 only when you want the extra tool to make a bounded request through your configured proxy.",
+              "format": "string",
+              "default": "0",
+              "choices": [
+                "0",
+                "1"
+              ],
+              "name": "IPVOLT_ENABLE_ROUTE_CHECK"
+            },
+            {
+              "description": "Private HTTP proxy URL, required only when the local route diagnostic is enabled. Supply through the client's local secret environment; never as a tool argument.",
+              "format": "string",
+              "isSecret": true,
+              "name": "IPVOLT_PROXY_URL"
+            }
+          ]
+        }
+      ],
+      "remotes": [
+        {
+          "type": "streamable-http",
+          "url": "https://mcp.ipvolt.com/mcp"
+        }
+      ]
+    },
+    "_meta": {
+      "io.modelcontextprotocol.registry/official": {
+        "status": "active",
+        "statusChangedAt": "2026-09-14T14:50:56.514389Z",
+        "publishedAt": "2026-09-14T14:50:56.514389Z",
+        "updatedAt": "2026-09-14T14:50:56.514389Z",
+        "isLatest": true
+      }
+    }
+  },
+  "workflowConclusion": "success"
+}
