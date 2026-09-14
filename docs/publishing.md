@@ -37,7 +37,7 @@ Enable only verified channels in the separately reviewed website content setting
 
 ## Official MCP Registry
 
-The identity is `io.github.ipvolt/proxy-toolkit`. The published npm artifact contains the matching `mcpName`. The first Registry release uses `registry/npm/server.json`, which derives from the reviewed package manifest with the inactive remote omitted. The root `server.json` remains the intended combined-distribution manifest; do not publish its remote until the endpoint is verified. The registry hosts metadata; it does not host the npm code. [Registry quickstart](https://modelcontextprotocol.io/registry/quickstart)
+The identity is `io.github.ipvolt/proxy-toolkit`. The published npm artifact contains the matching `mcpName`. The first Registry release uses `registry/npm/server.json`, which derives from the reviewed package manifest with the inactive remote omitted. The root `server.json` is the original combined-channel draft for Registry version `0.1.0`; that version has already been published using the npm-only manifest and cannot be overwritten. The published combined distribution uses `registry/hosted/server.json`, Registry `0.1.1` with the unchanged npm `0.1.0` package and verified remote. The registry hosts metadata; it does not host the npm code. [Registry quickstart](https://modelcontextprotocol.io/registry/quickstart)
 
 The official publisher release inspected for this candidate is1.8.1. Its Linux/amd64 archive is:
 
@@ -48,7 +48,7 @@ sha256:a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
 
 Download into an isolated temporary directory, verify that digest before extracting/executing, and keep publisher authentication state outside the repository. The manually dispatched `publish-registry.yml` uses `login github-oidc` with `id-token: write` and no stored registry secret. It requires the separate tag `registry-npm-v0.1.0` and `reviewed_commit` matching the full reviewed metadata/workflow commit, verifies the exact public npm archive, refuses an already published Registry version, and reads back the active listing after a single publish attempt. The npm source tag stays `v0.1.0`; the registry workflow does not publish npm. [Registry Actions authentication](https://modelcontextprotocol.io/registry/github-actions)
 
-Registry versions and their metadata are immutable. Adding the verified remote later requires a new Registry version, such as `0.1.1`; it can continue to reference npm `0.1.0` if the package remains unchanged. Review that manifest explicitly rather than overwriting this initial version. [Registry versioning](https://modelcontextprotocol.io/registry/versioning)
+Registry versions and their metadata are immutable. The verified remote was added in Registry `0.1.1`, continuing to reference the unchanged npm `0.1.0`. Its dedicated `publish-registry-hosted.yml` workflow requires the frozen `registry-hosted-v0.1.1` tag and reviewed integration commit, verifies the existing npm archive and prior Registry entry, rejects an already published target version, and exercises all four public tools on both protocols immediately before one publish attempt. This release is complete; any later metadata change needs a separately reviewed new Registry version and guard update. Never rerun either completed release to overwrite it. [Registry versioning](https://modelcontextprotocol.io/registry/versioning)
 
 ## Smithery and Glama
 
