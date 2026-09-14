@@ -1,0 +1,126 @@
+{
+  "passed": true,
+  "checkedAt": "2026-09-14T11:55:46.247488+00:00",
+  "client": "Claude Code",
+  "clientVersion": "2.1.270 (Claude Code)",
+  "nodeVersion": "v24.20.0",
+  "packageVersion": "0.1.0",
+  "archiveSha256": "57adcee5dd4db1b0a4e11df196c415fcd6de3aa76f540689f399b75e81076339",
+  "artifactFiles": {
+    "dist/server.d.ts": "0c902e77a2151b97b9a0f64b44cb0489f5eaa864687c14da4bea28073383e6f5",
+    "dist/protocol-safety.js": "01723b2737b9eb136183b0d8a61ee60dbccab0de9d8b63c6febdea52833da087",
+    "dist/server.js": "9d8b89cf22fe8b2eee3667bf2c982645b2404bf65e432465c40cd3abd5593f18",
+    "dist/meta.js": "02f647f1e8967ea4364147f4d2eaea01d9b0a00ef25df70e938c0ec645dc8337",
+    "dist/protocol-safety.d.ts": "3c85ede1b4b67d22ec0143cbbb9f4f9ca1c05b3f1f605c15ccbbdabd4bdf468c",
+    "dist/meta.d.ts": "d23d4749559c3973f1148a288de8571578b349930ce59fb0872f952ade5ebaae",
+    "dist/core/diagnostics.js": "a85def50f698f87572c5597b3dad393bb2918fc1e0f162a4f3906f45d4a3d46d",
+    "dist/core/config.d.ts": "73d1c85aa845a6347f71cf2a63d0ab6015596d75a6799be3c047949eecdecbca",
+    "dist/core/catalog.js": "730922e20aca2a794d2964027627e00408d08cc1a9009f1b387900a0d01a158f",
+    "dist/core/diagnostics.d.ts": "f0c2e71beb7724ca6f33729cc29180a32219b04df4f6db67ff07299268284570",
+    "dist/core/config.js": "6384d282c36d2ff10418026a8772721832587d32b9d7ee4ef556bff6ba30a6b4",
+    "dist/core/catalog.d.ts": "da285bb590c8642f7ee3a6cd8f53feda40d9f2d7fe14b499c04eb17622047d49",
+    "dist/transports/http.d.ts": "2aa59f954df6424072624f05d365607281f1e060c911498a422a59b4ec696f95",
+    "dist/transports/stdio.js": "da129753b78be928363327d7dbd54f37be730614638c9c48e9f6358fa411c79c",
+    "dist/transports/stdio.d.ts": "43e818adf60173644896298637f47b01d5819b17eda46eaa32d0c7d64724d012",
+    "dist/transports/http.js": "6b9ff203eff85bd93d2858ba072a816db98d01b5b550f615d1211151475bcc35",
+    "dist/local/route-check.js": "3545cd07eb6a57d4e07e4c9ba4cf23482c9fc1941fc96cb615dd941ff9ee6ef4",
+    "dist/local/route-runtime.d.ts": "a7488af22b5b55233be75ad4b1257f546e8281efcd9e0e69ee368382516c9876",
+    "dist/local/route-check.d.ts": "d1480198432876612360f29e3d0ba492d16a49fa73b4fdf32075af76629445aa",
+    "dist/local/route-runtime.js": "f554c7759cee0dd3114d7297d6d2feedceb0c879df1c00509228c8e1e8b87c87",
+    "content/catalog.json": "ec3f7bf7eaac59be29233ecf60d7b0b27cbbef2fa5e5269917d64d4c3304d2f1"
+  },
+  "runs": [
+    {
+      "transport": "stdio",
+      "exitCode": 0,
+      "connections": [
+        {
+          "name": "ipvolt",
+          "status": "connected"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "mcp__ipvolt__search_proxy_docs",
+          "input": {
+            "query": "HTTPX proxy authentication 407",
+            "limit": 2
+          }
+        },
+        {
+          "name": "mcp__ipvolt__diagnose_proxy_error",
+          "input": {
+            "client": "httpx",
+            "version": "0.28.1",
+            "phase": "connect_tunnel",
+            "status": 407,
+            "method": "GET",
+            "responseSource": "proxy"
+          }
+        }
+      ],
+      "toolResults": [
+        {
+          "name": "mcp__ipvolt__search_proxy_docs",
+          "isError": false,
+          "content": "{\"results\":[{\"id\":\"/blog/proxy-status-codes-407-429-502\",\"title\":\"Proxy errors explained: 407, 429, 502 and 504\",\"description\":\"Identify which layer returned a proxy error, check authentication and rate limits, and decide when a bounded retry of a failed request is safe.\",\"reviewedAt\":\"2026-09-11\",\"topic\":\"analysis\",\"url\":\"https://ipvolt.com/blog/proxy-status-codes-407-429-502\",\"sha256\":\"37464e99b1c173d1b2b9af233e5ecbf2861dc6706b3b34a1f599d802f585c01a\",\"score\":27,\"snippet\":\"# Proxy errors explained: 407, 429, 502 and 504\\n\\nSource: https://ipvolt.com/blog/proxy-status-codes-407-429-502\\nMarkdown: https://ipvolt.com/blog/proxy-status-codes-407-429-502.md\\n\\n[Home](https://ipvolt.com/index.md) / [Blog](https://ipvolt.com/blog.md) / Proxy errors explained: 407, 429, 502 and 504\\n\\nCategory: Analysis\\nPublished: 2026-09-11\\nUpdated: 2026-09-11\\nAuthor: ipvolt team\\nReading time: 6 minutes\\nTags: proxies, troubleshooting\\n\\nIdentify which layer returned a proxy error, check authenticat\"},{\"id\":\"/guides/fix-proxy-error-407\",\"title\":\"Fix proxy error 407 without guessing\",\"description\":\"Diagnose Proxy Authentication Required in a repeatable order: gateway, authentication method, credential encoding, account scope and client configuration.\",\"reviewedAt\":\"2026-09-10\",\"topic\":\"troubleshooting\",\"url\":\"https://ipvolt.com/guides/fix-proxy-error-407\",\"sha256\":\"413d1b4cf65aed37cf256c60c037faf004ba9c3101f40108fa5c308060cce80a\",\"score\":27,\"snippet\":\"# Fix proxy error 407 without guessing\\n\\nSource: https://ipvolt.com/guides/fix-proxy-error-407\\nMarkdown: https://ipvolt.com/guides/fix-proxy-error-407.md\\n\\n[Home](https://ipvolt.com/index.md) / [Guides](https://ipvolt.com/guides.md) / [Fix proxy error 407 without guessing](https://ipvolt.com/guides/fix-proxy-error-407.md)\\n\\nCategory: Troubleshooting\\nReviewed: 2026-09-10\\nReading time: 4 minutes\\nAuthor: ipvolt\\n\\nDiagnose Proxy Authentication Required in a repeatable order: gateway, authentication method, cr\"}],\"provenance\":{\"sourceRelease\":\"20260914-hero-split\",\"bundleSha256\":\"c6679b20124395b58cc00aea571589d466364dc41271134fb3d27e8803c5255b\",\"generatedAt\":\"2026-09-14T11:30:24.422Z\"}}"
+        },
+        {
+          "name": "mcp__ipvolt__diagnose_proxy_error",
+          "isError": false,
+          "content": "{\"client\":\"httpx\",\"version\":\"0.28.1\",\"rulesRevision\":\"2026-09-14.1\",\"evidence\":{\"client\":\"httpx\",\"version\":\"0.28.1\",\"phase\":\"connect_tunnel\",\"status\":407,\"responseSource\":\"proxy\",\"method\":\"GET\"},\"summary\":\"407 reports an intermediary authentication requirement. It does not identify a wrong password as the sole cause.\",\"candidates\":[{\"code\":\"proxy_authentication_required\",\"confidence\":\"supported\",\"explanation\":\"407 reports an intermediary authentication requirement. It does not identify a wrong password as the sole cause.\",\"nextCheck\":\"Confirm the responding proxy, documented authentication scheme, gateway/port, account access and how credentials reach this client's proxy option. Inspect only redacted authentication metadata.\"},{\"code\":\"proxy_tunnel_failure\",\"confidence\":\"possible\",\"explanation\":\"Proxy/tunnel setup may fail because of authentication, gateway configuration, target policy or an upstream connection failure.\",\"nextCheck\":\"Inspect the CONNECT status and the documented gateway protocol with secrets removed. A generic proxy exception alone does not distinguish these causes.\"}],\"uncertainty\":[\"These are interpretations of the supplied observations, not a live network test or proof of the root cause.\"],\"retry\":{\"automaticRetryRecommended\":false,\"category\":\"bounded_retry_after_cause_check\",\"advice\":\"GET/HEAD/OPTIONS are intended to be safe methods, but verify the actual endpoint's semantics. Resolve permanent configuration/authentication failures first; use a small attempt budget, deadline and backoff, and honor an observed Retry-After. This tool does not execute retries.\"},\"sources\":[\"https://ipvolt.com/guides/fix-proxy-error-407\",\"https://ipvolt.com/blog/proxy-retries-duplicate-jobs\"]}"
+        }
+      ],
+      "resultSubtype": "success",
+      "resultIsError": false,
+      "answer": "Both calls completed successfully.\n\n```json\n{\n  \"searchSourceUrl\": \"https://ipvolt.com/blog/proxy-status-codes-407-429-502\",\n  \"firstDiagnosticCandidateCode\": \"proxy_authentication_required\"\n}\n```\n\nNotes: search returned 2 results (first shown above; the second was `https://ipvolt.com/guides/fix-proxy-error-407`), and the first diagnostic candidate had confidence `supported`.",
+      "stderr": ""
+    },
+    {
+      "transport": "http",
+      "exitCode": 0,
+      "connections": [
+        {
+          "name": "ipvolt",
+          "status": "connected"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "mcp__ipvolt__search_proxy_docs",
+          "input": {
+            "query": "HTTPX proxy authentication 407",
+            "limit": 2
+          }
+        },
+        {
+          "name": "mcp__ipvolt__diagnose_proxy_error",
+          "input": {
+            "client": "httpx",
+            "version": "0.28.1",
+            "phase": "connect_tunnel",
+            "status": 407,
+            "method": "GET",
+            "responseSource": "proxy"
+          }
+        }
+      ],
+      "toolResults": [
+        {
+          "name": "mcp__ipvolt__search_proxy_docs",
+          "isError": false,
+          "content": "{\"results\":[{\"id\":\"/blog/proxy-status-codes-407-429-502\",\"title\":\"Proxy errors explained: 407, 429, 502 and 504\",\"description\":\"Identify which layer returned a proxy error, check authentication and rate limits, and decide when a bounded retry of a failed request is safe.\",\"reviewedAt\":\"2026-09-11\",\"topic\":\"analysis\",\"url\":\"https://ipvolt.com/blog/proxy-status-codes-407-429-502\",\"sha256\":\"37464e99b1c173d1b2b9af233e5ecbf2861dc6706b3b34a1f599d802f585c01a\",\"score\":27,\"snippet\":\"# Proxy errors explained: 407, 429, 502 and 504\\n\\nSource: https://ipvolt.com/blog/proxy-status-codes-407-429-502\\nMarkdown: https://ipvolt.com/blog/proxy-status-codes-407-429-502.md\\n\\n[Home](https://ipvolt.com/index.md) / [Blog](https://ipvolt.com/blog.md) / Proxy errors explained: 407, 429, 502 and 504\\n\\nCategory: Analysis\\nPublished: 2026-09-11\\nUpdated: 2026-09-11\\nAuthor: ipvolt team\\nReading time: 6 minutes\\nTags: proxies, troubleshooting\\n\\nIdentify which layer returned a proxy error, check authenticat\"},{\"id\":\"/guides/fix-proxy-error-407\",\"title\":\"Fix proxy error 407 without guessing\",\"description\":\"Diagnose Proxy Authentication Required in a repeatable order: gateway, authentication method, credential encoding, account scope and client configuration.\",\"reviewedAt\":\"2026-09-10\",\"topic\":\"troubleshooting\",\"url\":\"https://ipvolt.com/guides/fix-proxy-error-407\",\"sha256\":\"413d1b4cf65aed37cf256c60c037faf004ba9c3101f40108fa5c308060cce80a\",\"score\":27,\"snippet\":\"# Fix proxy error 407 without guessing\\n\\nSource: https://ipvolt.com/guides/fix-proxy-error-407\\nMarkdown: https://ipvolt.com/guides/fix-proxy-error-407.md\\n\\n[Home](https://ipvolt.com/index.md) / [Guides](https://ipvolt.com/guides.md) / [Fix proxy error 407 without guessing](https://ipvolt.com/guides/fix-proxy-error-407.md)\\n\\nCategory: Troubleshooting\\nReviewed: 2026-09-10\\nReading time: 4 minutes\\nAuthor: ipvolt\\n\\nDiagnose Proxy Authentication Required in a repeatable order: gateway, authentication method, cr\"}],\"provenance\":{\"sourceRelease\":\"20260914-hero-split\",\"bundleSha256\":\"c6679b20124395b58cc00aea571589d466364dc41271134fb3d27e8803c5255b\",\"generatedAt\":\"2026-09-14T11:30:24.422Z\"}}"
+        },
+        {
+          "name": "mcp__ipvolt__diagnose_proxy_error",
+          "isError": false,
+          "content": "{\"client\":\"httpx\",\"version\":\"0.28.1\",\"rulesRevision\":\"2026-09-14.1\",\"evidence\":{\"client\":\"httpx\",\"version\":\"0.28.1\",\"phase\":\"connect_tunnel\",\"status\":407,\"responseSource\":\"proxy\",\"method\":\"GET\"},\"summary\":\"407 reports an intermediary authentication requirement. It does not identify a wrong password as the sole cause.\",\"candidates\":[{\"code\":\"proxy_authentication_required\",\"confidence\":\"supported\",\"explanation\":\"407 reports an intermediary authentication requirement. It does not identify a wrong password as the sole cause.\",\"nextCheck\":\"Confirm the responding proxy, documented authentication scheme, gateway/port, account access and how credentials reach this client's proxy option. Inspect only redacted authentication metadata.\"},{\"code\":\"proxy_tunnel_failure\",\"confidence\":\"possible\",\"explanation\":\"Proxy/tunnel setup may fail because of authentication, gateway configuration, target policy or an upstream connection failure.\",\"nextCheck\":\"Inspect the CONNECT status and the documented gateway protocol with secrets removed. A generic proxy exception alone does not distinguish these causes.\"}],\"uncertainty\":[\"These are interpretations of the supplied observations, not a live network test or proof of the root cause.\"],\"retry\":{\"automaticRetryRecommended\":false,\"category\":\"bounded_retry_after_cause_check\",\"advice\":\"GET/HEAD/OPTIONS are intended to be safe methods, but verify the actual endpoint's semantics. Resolve permanent configuration/authentication failures first; use a small attempt budget, deadline and backoff, and honor an observed Retry-After. This tool does not execute retries.\"},\"sources\":[\"https://ipvolt.com/guides/fix-proxy-error-407\",\"https://ipvolt.com/blog/proxy-retries-duplicate-jobs\"]}"
+        }
+      ],
+      "resultSubtype": "success",
+      "resultIsError": false,
+      "answer": "Both calls completed.\n\n```json\n{\n  \"searchSourceUrl\": \"https://ipvolt.com/blog/proxy-status-codes-407-429-502\",\n  \"firstDiagnosticCandidateCode\": \"proxy_authentication_required\"\n}\n```\n\nNotes: search returned 2 results; the URL above is from the first (top-scored) result. The second was `https://ipvolt.com/guides/fix-proxy-error-407`. The diagnostic's first candidate was rated confidence \"supported\".",
+      "stderr": ""
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+# BEGIN IPVOLT MCP MANAGED
+mcp.ipvolt.com {
+    # Request arguments, diagnostic nonces and visitor addresses are not access logs.
+    log_skip
+    header X-Robots-Tag "noindex, nofollow"
+    header X-Content-Type-Options "nosniff"
+    request_body {
+        max_size 32768
+    }
+    @public_mcp path /mcp /egress
+    handle @public_mcp {
+        reverse_proxy 127.0.0.1:3040 {
+            # This is the actual socket peer, independent of forwarded headers.
+            header_up X-IPVolt-Peer {http.request.remote.host}
+            header_up -Forwarded
+            header_up -X-Real-IP
+            header_up -X-Forwarded-For
+            transport http {
+                dial_timeout 2s
+                response_header_timeout 12s
+                read_timeout 12s
+                write_timeout 12s
+                max_response_header 16384
+                compression off
+            }
+        }
+    }
+    handle {
+        respond "Not found" 404
+    }
+    handle_errors {
+        respond "Request could not be completed" {err.status_code}
+    }
+}
+# END IPVOLT MCP MANAGED
