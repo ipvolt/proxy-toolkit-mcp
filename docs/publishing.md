@@ -37,7 +37,7 @@ Enable only verified channels in the separately reviewed website content setting
 
 ## Official MCP Registry
 
-The identity is `io.github.ipvolt/proxy-toolkit`. The npm artifact contains the matching `mcpName`; the package version and remote URL are declared together in server.json. Validate with `npm run check:manifest`, then verify both declared distribution paths are actually reachable. The registry hosts metadata; it does not host the npm code. [Registry quickstart](https://modelcontextprotocol.io/registry/quickstart)
+The identity is `io.github.ipvolt/proxy-toolkit`. The published npm artifact contains the matching `mcpName`. The first Registry release uses `registry/npm/server.json`, which derives from the reviewed package manifest with the inactive remote omitted. The root `server.json` remains the intended combined-distribution manifest; do not publish its remote until the endpoint is verified. The registry hosts metadata; it does not host the npm code. [Registry quickstart](https://modelcontextprotocol.io/registry/quickstart)
 
 The official publisher release inspected for this candidate is1.8.1. Its Linux/amd64 archive is:
 
@@ -46,15 +46,17 @@ https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-pu
 sha256:a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
 ```
 
-Download into an isolated temporary directory, verify that digest before extracting/executing, and keep publisher authentication state outside the repository. An owner can use `mcp-publisher login github`; a later GitHub workflow can use `login github-oidc` with `id-token: write`. Run `mcp-publisher publish` from the frozen manifest directory. Read back the exact server name/version using the registry API and test an actual fresh client. [Registry Actions authentication](https://modelcontextprotocol.io/registry/github-actions)
+Download into an isolated temporary directory, verify that digest before extracting/executing, and keep publisher authentication state outside the repository. The manually dispatched `publish-registry.yml` uses `login github-oidc` with `id-token: write` and no stored registry secret. It requires the separate tag `registry-npm-v0.1.0` and `reviewed_commit` matching the full reviewed metadata/workflow commit, verifies the exact public npm archive, refuses an already published Registry version, and reads back the active listing after a single publish attempt. The npm source tag stays `v0.1.0`; the registry workflow does not publish npm. [Registry Actions authentication](https://modelcontextprotocol.io/registry/github-actions)
+
+Registry versions and their metadata are immutable. Adding the verified remote later requires a new Registry version, such as `0.1.1`; it can continue to reference npm `0.1.0` if the package remains unchanged. Review that manifest explicitly rather than overwriting this initial version. [Registry versioning](https://modelcontextprotocol.io/registry/versioning)
 
 ## Smithery and Glama
 
-Use the display name **ipvolt Proxy Toolkit**, description from server.json, public repository URL, and verified remote URL `https://mcp.ipvolt.com/mcp`. The remote requires no account, key or proxy credential. Describe the local route tool as optional and local only. Use a directory-specific campaign link to `/mcp` only where a listing supports website links; retain clean canonical links inside tool output.
+Use the display name **ipvolt Proxy Toolkit**, description from server.json, public repository URL, and verified remote URL `https://mcp.ipvolt.com/mcp`. The remote requires no account, key or proxy credential. Describe the local route tool as optional and local only. Use the live homepage until `/mcp` is actually batch-released. Afterward, use a directory-specific campaign link to `/mcp` only where a listing supports website links; retain clean canonical links inside tool output.
 
 Smithery accepts a public HTTPS Streamable HTTP URL through its publishing page or `smithery mcp publish "https://mcp.ipvolt.com/mcp" -n @ipvolt/proxy-toolkit`. Verify namespace access first. It scans the remote tools and its gateway may mediate subsequent calls. Test discovery and a tool call through the resulting directory URL; the direct endpoint test does not cover this path. [Smithery publishing](https://smithery.ai/docs/build/publish)
 
-Glama accepts a public GitHub repository for the source listing and a healthy HTTPS Streamable HTTP URL for the connector. Submit the matching source and remote without implying that the remote exposes the local diagnostic. Claim ownership through the matching GitHub identity when available. A directory gateway has its own logging/data handling; ipvolt's no-body-log policy applies to ipvolt's service, not third-party gateways. [Glama submission and ownership](https://glama.ai/mcp/faq)
+Glama accepts a public GitHub repository for the source listing and a healthy HTTPS Streamable HTTP URL for the connector. Its Add Server form currently requires a Glama account; the root `glama.json` identifies GitHub user `ipvolt` as the source maintainer. Submit the matching source and remote without implying that the remote exposes the local diagnostic. Claim ownership through the matching GitHub identity when available. A directory gateway has its own logging/data handling; ipvolt's no-body-log policy applies to ipvolt's service, not third-party gateways. [Glama submission and ownership](https://glama.ai/mcp/faq)
 
 PulseMCP paused submissions and updates in its3 September2026 notice. Recheck its actual submission page before proceeding; do not claim acceptance or create duplicate listings to work around the pause. [PulseMCP submissions](https://www.pulsemcp.com/submit)
 

@@ -1,0 +1,118 @@
+{
+  "reviewedAt": "2026-09-14T12:55:56.196640+00:00",
+  "scope": "Prepared npm-only official MCP Registry publication; no authentication or publication performed",
+  "sourceCommit": "7660651b2ee22866db5fa70e3d2b3dee68760c43",
+  "serverName": "io.github.ipvolt/proxy-toolkit",
+  "registryVersion": "0.1.0",
+  "package": "@ipvolt/proxy-toolkit-mcp@0.1.0",
+  "npmArchiveSha256": "4848d77611d09a004454577e9a2f3316c420bcbca3a33633ae8a43876ec48f81",
+  "npmIntegrity": "sha512-ubn8Tv3ROGwkN6kln8gEJ98qF+7x1r/QIAobCacJ+1X4cV/WOISSg95rgVDfBW379KiXMQmIlLvWC24nAR8t7A==",
+  "files": {
+    "registry/npm/server.json": "08e336e884ff50c5da13f7897187b9dae9f1d422262b8b07e85d86bdf6540e2d",
+    "registry/npm/check.py": "1a172b64e6ca0687912bc150338b496d70a49813f3dff213f8b7a407bb4f910e",
+    "registry/npm/test_check.py": "78d9ea459df5d5c59235cbd59f68c10fbfe9b9019523f6905afeb6037c5ea1aa",
+    ".github/workflows/publish-registry.yml": "651f3778b94f79f10cf5d49866443bfe4a8a30cd649f509feee2cafb191e28b6"
+  },
+  "checks": {
+    "controlledTests": {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s registry/npm -p 'test_*.py' -v",
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0
+    },
+    "workflowAuthSentinel": {
+      "executedActualShellFragment": true,
+      "publisher": "controlled fake",
+      "cases": [
+        "login failure",
+        "publish failure",
+        "success"
+      ],
+      "sentinelAbsentFromOutput": true
+    },
+    "yamlAndShellSyntax": {
+      "yamlParsed": true,
+      "bashScriptsPassed": 5
+    },
+    "officialSchema": {
+      "schema": "schemas/server-2025-12-11.json",
+      "runtime": "Node24.20.0",
+      "valid": true
+    },
+    "publicNpm": {
+      "command": "python3 registry/npm/check.py public-npm",
+      "passed": true,
+      "checks": [
+        "name",
+        "version",
+        "mcpName",
+        "repository",
+        "dist.integrity",
+        "fixed tarball URL",
+        "downloaded SHA-256 and SHA-512",
+        "embedded package.json and server.json match frozen source"
+      ]
+    },
+    "registryValidate": {
+      "endpoint": "https://registry.modelcontextprotocol.io/v0/validate",
+      "method": "POST",
+      "nonPublishing": true,
+      "response": {
+        "valid": true,
+        "issues": []
+      }
+    },
+    "publisherArchive": {
+      "version": "1.8.1",
+      "platform": "linux/amd64",
+      "url": "https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz",
+      "sha256": "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc",
+      "downloadBytes": 7339841,
+      "officialReleaseApiDigestMatched": true,
+      "downloadDigestMatched": true,
+      "executableEntryVerified": true,
+      "executed": false
+    },
+    "publisherSourceReview": {
+      "positionalValidateAndPublishPaths": true,
+      "tokenLocation": "$HOME/.config/mcp-publisher/token.json",
+      "tokenDirectoryMode": "0700",
+      "tokenFileMode": "0600",
+      "successDoesNotPrintTokens": true,
+      "upstreamErrorBodiesSuppressedByWorkflow": true
+    }
+  },
+  "dispatch": {
+    "ref": "refs/tags/registry-npm-v0.1.0",
+    "reviewed_commit": "Full reviewed integration commit; must equal GITHUB_SHA, GITHUB_WORKFLOW_SHA and checkout HEAD",
+    "command": "gh workflow run publish-registry.yml --ref registry-npm-v0.1.0 -f reviewed_commit=REVIEWED_INTEGRATION_COMMIT",
+    "requiresWorkflowOnDefaultBranch": true,
+    "doesNotPublishNpm": true
+  },
+  "futureRemote": {
+    "registryVersion": "0.1.1",
+    "requiresSeparateReviewedPublication": true,
+    "requiresVerifiedPublicEndpoint": true,
+    "mayRetainNpmVersion": "0.1.0",
+    "reason": "Registry versions and metadata are immutable. A 0.1.0 prerelease would sort below already published0.1.0."
+  },
+  "notPerformed": [
+    "Git commits or pushes",
+    "GitHub workflow dispatch",
+    "OIDC authentication",
+    "Registry publication or public listing read-back",
+    "DNS, deployment or remote service changes"
+  ],
+  "primarySources": [
+    "https://modelcontextprotocol.io/registry/github-actions",
+    "https://modelcontextprotocol.io/registry/versioning",
+    "https://modelcontextprotocol.io/registry/quickstart",
+    "https://github.com/modelcontextprotocol/registry/releases/tag/v1.8.1",
+    "https://api.github.com/repos/modelcontextprotocol/registry/releases/tags/v1.8.1",
+    "https://raw.githubusercontent.com/modelcontextprotocol/registry/v1.8.1/cmd/publisher/commands/validate.go",
+    "https://raw.githubusercontent.com/modelcontextprotocol/registry/v1.8.1/cmd/publisher/commands/publish.go",
+    "https://raw.githubusercontent.com/modelcontextprotocol/registry/v1.8.1/cmd/publisher/commands/login.go",
+    "https://raw.githubusercontent.com/modelcontextprotocol/registry/v1.8.1/cmd/publisher/auth/github-oidc.go",
+    "https://raw.githubusercontent.com/modelcontextprotocol/registry/v1.8.1/pkg/model/types.go"
+  ]
+}
