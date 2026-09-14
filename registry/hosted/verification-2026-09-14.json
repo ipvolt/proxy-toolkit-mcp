@@ -1,0 +1,124 @@
+{
+  "verifiedAt": "2026-09-14T14:44:41.843226+00:00",
+  "scope": "Prepared combined Registry metadata and guarded workflow; publication remains a separate reviewed dispatch",
+  "registry": {
+    "name": "io.github.ipvolt/proxy-toolkit",
+    "version": "0.1.1",
+    "existingVersion": "0.1.0",
+    "existingMetadataUnchangedAndActive": true,
+    "newVersionAbsentAtVerification": true
+  },
+  "npm": {
+    "package": "@ipvolt/proxy-toolkit-mcp",
+    "version": "0.1.0",
+    "sourceCommit": "7660651b2ee22866db5fa70e3d2b3dee68760c43",
+    "archiveSha256": "4848d77611d09a004454577e9a2f3316c420bcbca3a33633ae8a43876ec48f81",
+    "integrity": "sha512-ubn8Tv3ROGwkN6kln8gEJ98qF+7x1r/QIAobCacJ+1X4cV/WOISSg95rgVDfBW379KiXMQmIlLvWC24nAR8t7A==",
+    "liveMetadataDownloadAndEmbeddedSourceVerified": true
+  },
+  "hosted": {
+    "endpoint": "https://mcp.ipvolt.com/mcp",
+    "sourceCommit": "8e9ab8257776cb06c8252c719f576aba3b966fd9",
+    "runtimeVersion": "0.1.0",
+    "sdkVersion": "2.0.0",
+    "node": "24.20.0",
+    "protocols": [
+      "2025-11-25",
+      "2026-07-28"
+    ],
+    "actualPublicToolCallsPassed": 8,
+    "exactlyFourPublicTools": true,
+    "localRouteToolAbsent": true,
+    "catalogBundleSha256": "c6679b20124395b58cc00aea571589d466364dc41271134fb3d27e8803c5255b",
+    "templateRevision": "2026-09-14.2",
+    "tlsVerificationEnabled": true,
+    "redirectsDisabled": true,
+    "requestBudget": 30,
+    "overallDeadlineSeconds": 60,
+    "maxResponseBytes": 131072
+  },
+  "checks": {
+    "newPythonGuardTests": {
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0
+    },
+    "newNodeRemoteTests": {
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    "sentinelCases": [
+      "auth failure",
+      "fresh prepublication guard failure",
+      "publish failure",
+      "success",
+      "rejected CLI debug environment"
+    ],
+    "remoteFailureCases": [
+      "unexpected tool catalog",
+      "unreviewed successful template result",
+      "oversized response",
+      "stalled response",
+      "unsafe TLS/debug/proxy environment"
+    ],
+    "officialSchemaValid": true,
+    "workflowYamlParsed": true,
+    "bashScriptsParsed": 6,
+    "registryValidate": {
+      "endpoint": "https://registry.modelcontextprotocol.io/v0/validate",
+      "method": "POST",
+      "nonPublishing": true,
+      "result": {
+        "valid": true,
+        "issues": []
+      }
+    }
+  },
+  "commands": [
+    "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s registry/hosted -p 'test_*.py' -v",
+    "node --import tsx --test registry/hosted/check-remote.test.mjs",
+    "python3 registry/hosted/check.py public-npm",
+    "python3 registry/hosted/check.py remote"
+  ],
+  "workflow": {
+    "file": ".github/workflows/publish-registry-hosted.yml",
+    "ref": "refs/tags/registry-hosted-v0.1.1",
+    "reviewedCommit": "Required full integration commit matching dispatch, workflow and checkout SHAs",
+    "command": "gh workflow run publish-registry-hosted.yml --ref registry-hosted-v0.1.1 -f reviewed_commit=REVIEWED_INTEGRATION_COMMIT",
+    "authentication": "GitHub OIDC",
+    "rawAuthAndPublishOutputSuppressed": true,
+    "remoteChildReceivesOnlyPathEnvironment": true,
+    "freshRemoteVerificationImmediatelyBeforePublish": true,
+    "publishAttempts": 1,
+    "readBackAfterAttemptRegardlessOfExitStatus": true,
+    "doesNotPublishNpm": true
+  },
+  "publisher": {
+    "version": "1.8.1",
+    "platform": "linux/amd64",
+    "archiveSha256": "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc",
+    "verification": "Reuse the previously downloaded and verified official publisher pin recorded in registry/npm/verification-2026-09-14.json"
+  },
+  "files": {
+    "registry/hosted/server.json": "c69c3ddc2472e895ede2130797e8ec36370686ca41a6ce0ab932bbc67063a3b1",
+    "registry/hosted/check.py": "206f2bdeb778637be129fe692cf4d9890c5b2f442a72e3754b1ffdfc4e769310",
+    "registry/hosted/check-remote.mjs": "0d9cceecdb662eccf28fb10a8b911547b927555cbf2502d0d145f6fff7e70df7",
+    "registry/hosted/test_check.py": "18c7d1cd8273872169aa00d75a01ca4f4c13cb9fe70d5f078b129043abb83a41",
+    "registry/hosted/check-remote.test.mjs": "922803fc3b9d0c0872a34775a86d0fd59620cd361453b23411f0d7305e44e8dd",
+    ".github/workflows/publish-registry-hosted.yml": "cb074e4b4d816d0c3f3e0e968cf61ac4c787ded46b2eeddd8ae44cc425b76039"
+  },
+  "frozenReusedNpmHelperSha256": "1a172b64e6ca0687912bc150338b496d70a49813f3dff213f8b7a407bb4f910e",
+  "notPerformed": [
+    "Registry authentication or publication",
+    "Git push or release tag creation",
+    "GitHub workflow dispatch",
+    "Hosted deployment or runtime changes"
+  ],
+  "primarySources": [
+    "https://modelcontextprotocol.io/registry/remote-servers",
+    "https://modelcontextprotocol.io/registry/versioning",
+    "https://modelcontextprotocol.io/registry/github-actions",
+    "https://github.com/modelcontextprotocol/registry/releases/tag/v1.8.1"
+  ]
+}
