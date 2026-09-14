@@ -1,0 +1,82 @@
+{
+  "checkedAt": "2026-09-14T14:33:48.393Z",
+  "endpoint": "https://mcp.ipvolt.com/mcp",
+  "node": "v24.20.0",
+  "trustedPublicTls": true,
+  "localRouteToolAbsentAndRejected": true,
+  "results": [
+    {
+      "protocol": "2025-11-25",
+      "tool": "search_proxy_docs",
+      "ok": true
+    },
+    {
+      "protocol": "2025-11-25",
+      "tool": "get_proxy_doc",
+      "ok": true
+    },
+    {
+      "protocol": "2025-11-25",
+      "tool": "generate_proxy_config",
+      "ok": true
+    },
+    {
+      "protocol": "2025-11-25",
+      "tool": "diagnose_proxy_error",
+      "ok": true
+    },
+    {
+      "protocol": "2026-07-28",
+      "tool": "search_proxy_docs",
+      "ok": true
+    },
+    {
+      "protocol": "2026-07-28",
+      "tool": "get_proxy_doc",
+      "ok": true
+    },
+    {
+      "protocol": "2026-07-28",
+      "tool": "generate_proxy_config",
+      "ok": true
+    },
+    {
+      "protocol": "2026-07-28",
+      "tool": "diagnose_proxy_error",
+      "ok": true
+    }
+  ],
+  "echoNonceVerified": true,
+  "forwardedPeerHeadersIgnored": true,
+  "privateHealthHidden": true,
+  "methodAndCorsBoundariesVerified": true,
+  "noindexAndNoStoreVerified": true,
+  "release": "20260914-mcp-toolkit-rc2",
+  "artifactSha256": "aa48c45ee025851925068f9e900e99ee4fb6adb4e780663358f0fdd1f1f5d28b",
+  "sourceCommit": "8e9ab8257776cb06c8252c719f576aba3b966fd9",
+  "sourceCi": "https://github.com/ipvolt/proxy-toolkit-mcp/actions/runs/34855809062",
+  "loopbackListen": "127.0.0.1:3040",
+  "unprivilegedService": true,
+  "outboundConnectDenied": true,
+  "unchangedWebsiteRelease": "20260914-hero-3d",
+  "independentServicesHealthy": [
+    "website",
+    "admin",
+    "private-board"
+  ],
+  "npmVersionUnchanged": "0.1.0",
+  "firstActivation": {
+    "release": "20260914-mcp-toolkit-rc1",
+    "result": "automatically rolled back and verified",
+    "cause": "HTTP entrypoint did not recognize deployment through the current symlink"
+  },
+  "regressionVerification": {
+    "toolkitTests": 47,
+    "deploymentTests": 20,
+    "nodeVersions": [
+      "24.20.0",
+      "26.8.1"
+    ],
+    "compiledSymlinkStartupAndImportChecks": true
+  }
+}

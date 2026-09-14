@@ -37,8 +37,11 @@ for (const protocol of ['2025-11-25', '2026-07-28']) {
 async function request(path, status, init = {}, hostedHeaders = false) {
   const response = await fetch(new URL(path, origin), { ...init, redirect: 'error', signal: AbortSignal.timeout(10_000) });
   assert.equal(response.status, status, `${init.method ?? 'GET'} ${path.split('?')[0]}`);
-  assert.equal(response.headers.get('x-robots-tag'), 'noindex, nofollow');
-  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+  // Caddy and the application both protect their own responses; a proxied
+  // response may repeat the same directives. Verify their effective values.
+  const directives = name => [...new Set((response.headers.get(name) ?? '').split(',').map(value => value.trim().toLowerCase()))].sort();
+  assert.deepEqual(directives('x-robots-tag'), ['nofollow', 'noindex']);
+  assert.deepEqual(directives('x-content-type-options'), ['nosniff']);
   if (hostedHeaders) assert.equal(response.headers.get('cache-control'), 'no-store');
   return response;
 }
