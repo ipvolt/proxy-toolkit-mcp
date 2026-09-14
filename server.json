@@ -4,7 +4,7 @@
   "title": "ipvolt Proxy Toolkit",
   "description": "Proxy guides, tested configurations and error diagnostics, with an optional local route check.",
   "version": "0.1.0",
-  "websiteUrl": "https://ipvolt.com/mcp",
+  "websiteUrl": "https://ipvolt.com",
   "repository": {
     "url": "https://github.com/ipvolt/proxy-toolkit-mcp",
     "source": "github"

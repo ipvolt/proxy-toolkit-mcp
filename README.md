@@ -6,7 +6,7 @@ The toolkit is separate from ipvolt's commercial proxy service, which is not ope
 
 ## Availability
 
-This is the initial release candidate. Build from source using the instructions below. npm, the hosted endpoint and registry submissions are pending verification; see [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md). Registry metadata in `server.json` describes the intended release and is not evidence that a channel is live.
+Version 0.1.0 provides four local tools using a bundled public catalog. Check [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md) for verified npm availability, the hosted endpoint and registry listings. Source builds work independently of those distribution channels. Registry metadata in `server.json` describes the intended release and is not evidence that a channel is live.
 
 ## Tools
 
@@ -48,7 +48,20 @@ For a client that accepts a `mcpServers` configuration, use an absolute path to 
 
 The default local server exposes four tools, sends no telemetry and makes no network requests. A client may send tool results to its own model provider. The server cannot control that client's data handling.
 
-After the release is available on npm, the equivalent version-pinned command will be `npx --yes @ipvolt/proxy-toolkit-mcp@0.1.0`. Check release status before using it. Exact real-application and protocol results are recorded in [client compatibility](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/client-compatibility.md).
+For the npm distribution, use the pinned package version after confirming its availability in release status:
+
+```json
+{
+  "mcpServers": {
+    "ipvolt": {
+      "command": "npx",
+      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.1.0"]
+    }
+  }
+}
+```
+
+Exact real-application and protocol results are recorded in [client compatibility](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/client-compatibility.md).
 
 ## Tested configuration examples
 
@@ -71,7 +84,7 @@ The check uses an HTTP CONNECT proxy and verified destination TLS to request onl
 
 Success reports the exit address seen by that one echo request. It does not prove anonymity, country, proxy type, ownership, or the routing of a browser, shell, SDK or other agent tool. It consumes a small amount of proxy bandwidth. The echo service receives the request's exit address; application access logging is disabled. Diagnostic debug/TLS settings that could expose credentials or weaken verification are rejected.
 
-The diagnostic requires the hosted echo service to be available. The release candidate's controlled fixture checks do not claim a successful request through a live supplier.
+The diagnostic requires the hosted echo service to be available. Check release status before enabling it. Controlled fixture checks do not claim a successful request through a live supplier.
 
 ## Hosted service
 
