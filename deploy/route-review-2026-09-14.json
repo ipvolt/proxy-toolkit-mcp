@@ -1,0 +1,30 @@
+{
+  "reviewedAt": "2026-09-14T11:54:43.052114+00:00",
+  "review": "Independent source review by the core/deployment agent of the separately implemented local route checker.",
+  "sourceSha256": {
+    "src/local/route-check.ts": "73ab895504b621516910a6c17c0d6280d94d5194f5c26ce1bc346b10a808959f",
+    "src/local/route-runtime.ts": "036cc3dfa7511a5e5b0faa7f058a48de2a932ccf556eb5cb2c5e10f0d62a3876",
+    "tests/route-check.test.ts": "a49e729f079f7ba0376865dea7ca2e2ab7e7b8dc0eef4ab21ae4d46208527466",
+    "tests/route-fixtures/servers.ts": "461970216892513c258fc90935a854f6319066746e8ea995609733cc8e758327",
+    "tests/route-fixtures/child-probe.ts": "dd036a9f91502bd307fedb159e95718eb712285842c6449c78b17cfa15e9dec4"
+  },
+  "checks": {
+    "command": "node --import tsx --test tests/route-check.test.ts",
+    "node": "24.20.0",
+    "passed": 19,
+    "failed": 0
+  },
+  "blockingFindings": [],
+  "reviewedBoundaries": [
+    "Fixed public diagnostic endpoint and default profile; no model-supplied URL or credential.",
+    "Explicit HTTP CONNECT with no startup request, direct fallback or redirect.",
+    "TLS hostname/certificate verification, nonce/IP-only response and byte/time limits.",
+    "Credential isolation from origin/output and debug/TLS environment rejection.",
+    "Cancellation, concurrency limit and socket/agent cleanup."
+  ],
+  "limits": [
+    "Controlled local proxy and HTTPS fixtures only; no live supplier or public endpoint validation.",
+    "A successful route check describes one request from one local process, not other tools or a claimed proxy type/location.",
+    "Deployment Caddy peer-header trust and host isolation require separate real-host validation."
+  ]
+}

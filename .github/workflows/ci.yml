@@ -1,0 +1,29 @@
+name: Verify toolkit
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [24.20.0, 26.8.1]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - run: npm run check:content
+      - run: npm run check:manifest
+      - run: npm run check:package
+      - run: IPVOLT_DEPLOY_NODE="$(command -v node)" python3 -m unittest discover -s deploy -p 'test_*.py' -v

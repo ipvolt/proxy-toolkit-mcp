@@ -1,0 +1,31 @@
+{
+  "verifiedAt": "2026-09-14T11:59:01.438810+00:00",
+  "result": "pass",
+  "sourceSha256": {
+    "deploy/release.py": "74f3908000f986b25f0c7609b35970882492d62a22f7dfc868f6a2e4310f525e",
+    "deploy/test_release.py": "5504ebd59ad8c6f7f31b63ae075a963e043a72c23bba2df9d075de3f949a885c",
+    "deploy/ipvolt-mcp.service": "2a3df8e68c5f1765185a0b81fbae218964b480a210b12d511fa71e70d72ed311",
+    "deploy/ipvolt-mcp.env": "681b4d6de4476aaf7d58cd310d285801b8838c847671195ea88d0835a8eec9f3",
+    "deploy/ipvolt-mcp.caddy": "32a303d8fbfd7be44819ba24c1262f664bd310ea4bc63019977a8330e2e3a905",
+    "deploy/check-host-isolation.mjs": "c6fa074220fb71c9885c0f79ddbdbaedd645c88027c855ec800bd67289299a0a",
+    "deploy/README.md": "920fd559537ee596c8fceea1b68a16f9df84fbec7d14ac171cb18c3f104e41e2"
+  },
+  "tests": {
+    "command": "IPVOLT_DEPLOY_NODE=/path/to/node-24/bin/node python3 -m unittest -v deploy/test_release.py",
+    "passed": 18,
+    "failed": 0,
+    "skipped": 0,
+    "node": "24.20.0",
+    "scope": "Offline filesystem/systemd/Caddy simulations, bounded JSON/SSE parsing and one actual local Node HTTP-service health/discovery integration."
+  },
+  "independentReview": {
+    "result": "No blocking finding in reviewed deployment scope.",
+    "releasePySha256": "74f3908000f986b25f0c7609b35970882492d62a22f7dfc868f6a2e4310f525e",
+    "testReleasePySha256": "5504ebd59ad8c6f7f31b63ae075a963e043a72c23bba2df9d075de3f949a885c"
+  },
+  "notPerformed": [
+    "No production deployment, DNS change, Caddy reload, systemd installation or registry publication.",
+    "Real Linux systemd isolation, Caddy parsing and inactive candidate startup require the guarded validate command on the host.",
+    "Trusted public TLS and peer-header checks require activate after reviewed DNS configuration."
+  ]
+}

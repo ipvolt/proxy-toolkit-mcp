@@ -1,0 +1,81 @@
+{
+  "verifiedAt": "2026-09-14T11:44:22.818202+00:00",
+  "result": "pass",
+  "sourceSha256": {
+    "src/core/config.ts": "dbdb36e20683d8756c9c64f29fee0274978ab081aa9d2a6983b6f58e6c00de33",
+    "src/core/diagnostics.ts": "549e29428d1b3012df74ae83c4fdb0b993d028541ae3170f330be1e06d6cf172",
+    "tests/config.test.ts": "9401bc007cbb9e0db086f660d12a3ed51b62af366fbef48de75ef7e26217edaa",
+    "tests/diagnostics.test.ts": "3f3b24337565eb2099b153d720b3787c25fdf97d6feb3699f0404c81f907c2ce",
+    "tests/template-fixtures/run-templates.ts": "b54dc21597231723a44aa3983e229598e879fc9747900b902738d1baf1b2e03f"
+  },
+  "unitTests": {
+    "command": "node --import tsx --test tests/config.test.ts tests/diagnostics.test.ts",
+    "passed": 10,
+    "failed": 0,
+    "node": "24.20.0"
+  },
+  "typecheck": {
+    "command": "npm run typecheck",
+    "exitCode": 0
+  },
+  "templateFixture": {
+    "command": "node --import tsx tests/template-fixtures/run-templates.ts",
+    "dependencies": "Pinned client dependencies installed in a separate disposable directory; no runtime dependency changes required.",
+    "networkScope": "Temporary localhost HTTPS origin and authenticated HTTP CONNECT proxy only.",
+    "clients": [
+      {
+        "client": "curl",
+        "version": "8.22.0",
+        "runtime": "macOS OpenSSL 3.6.4"
+      },
+      {
+        "client": "requests",
+        "version": "2.34.2",
+        "runtime": "Python 3.14.7"
+      },
+      {
+        "client": "httpx",
+        "version": "0.28.1",
+        "runtime": "Python 3.14.7"
+      },
+      {
+        "client": "playwright",
+        "version": "1.63.0",
+        "runtime": "Node 24.20.0",
+        "interface": "APIRequestContext, not browser navigation"
+      }
+    ],
+    "passedForEachClient": [
+      "authenticated_CONNECT",
+      "ambient_proxy_and_NO_PROXY_override",
+      "no_redirect",
+      "407_without_fallback",
+      "unavailable_proxy_without_fallback",
+      "TLS_verification",
+      "response_timeout",
+      "unsupported_proxy_protocol",
+      "credential_redaction"
+    ],
+    "observedDifference": "Playwright can return the proxy 407 as an APIResponse instead of throwing. The test accepts the explicit status and verifies that no target request or direct fallback occurred.",
+    "limitations": [
+      "This is the exact tested matrix, not a claim of support for every platform or client version.",
+      "Requests and HTTPX timeout settings are phase/inactivity budgets, not a total wall-clock deadline.",
+      "Generated templates produce HTTP status or a bounded failure category; they do not validate response content."
+    ],
+    "playwrightAdditionalRegression": {
+      "cases": [
+        "DEBUG=pw:*",
+        "DEBUG=pw:api",
+        "NODE_DEBUG=http",
+        "NODE_DEBUG_NATIVE=TLSWRAP",
+        "NODE_TLS_REJECT_UNAUTHORIZED=0",
+        "NODE_OPTIONS=--trace-tls",
+        "NODE_OPTIONS=--tls-keylog"
+      ],
+      "passed": 7,
+      "networkRequests": 0,
+      "result": "Fixed unsafe_debug_environment response before Playwright import or proxy credential parsing; no sentinels in captured output."
+    }
+  },
+  "templateRevision": "2026-09-14.2"
+}

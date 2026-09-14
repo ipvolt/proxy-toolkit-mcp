@@ -1,0 +1,58 @@
+{
+  "name": "@ipvolt/proxy-toolkit-mcp",
+  "version": "0.1.0",
+  "description": "Reviewed proxy documentation, tested configuration templates and bounded local route diagnostics for MCP clients.",
+  "type": "module",
+  "license": "MIT",
+  "mcpName": "io.github.ipvolt/proxy-toolkit",
+  "keywords": ["mcp", "proxy", "curl", "httpx", "playwright", "diagnostics"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ipvolt/proxy-toolkit-mcp.git"
+  },
+  "homepage": "https://ipvolt.com/mcp",
+  "bugs": {
+    "url": "https://github.com/ipvolt/proxy-toolkit-mcp/issues"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "ipvolt-proxy-toolkit": "dist/transports/stdio.js"
+  },
+  "files": [
+    "dist/",
+    "content/",
+    "README.md",
+    "LICENSE",
+    "CONTENT-LICENSE.md",
+    "server.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "start": "node dist/transports/http.js",
+    "mcp": "node dist/transports/stdio.js",
+    "check:content": "node scripts/check-content.mjs",
+    "check:manifest": "node scripts/check-manifest.mjs",
+    "check:package": "node scripts/check-package.mjs"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "dependencies": {
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
+    "@types/node": "24.13.4",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2"
+  }
+}

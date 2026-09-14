@@ -1,0 +1,16 @@
+node_modules/
+.artifacts/
+__pycache__/
+*.pyc
+.npmrc
+.mcpregistry*
+dist/
+coverage/
+*.tgz
+.env
+.env.*
+!.env.example
+.cache/
+private/
+*.log
+.DS_Store

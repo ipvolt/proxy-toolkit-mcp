@@ -1,0 +1,64 @@
+# Managed by the reviewed ipvolt MCP deployment entrypoint.
+[Unit]
+Description=ipvolt Proxy Toolkit MCP
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=ipvolt-mcp
+Group=ipvolt-mcp
+WorkingDirectory=/opt/ipvolt-mcp/current
+EnvironmentFile=/etc/ipvolt-mcp.env
+ExecStartPre=/usr/bin/env -i /usr/local/bin/node /opt/ipvolt-mcp/current/deploy/check-host-isolation.mjs
+ExecStart=/usr/bin/env -i NODE_ENV=production IPVOLT_MCP_PORT=${IPVOLT_MCP_PORT} IPVOLT_MCP_TRUST_PROXY=${IPVOLT_MCP_TRUST_PROXY} IPVOLT_MCP_PUBLIC_URL=${IPVOLT_MCP_PUBLIC_URL} IPVOLT_MCP_ALLOWED_ORIGINS=${IPVOLT_MCP_ALLOWED_ORIGINS} /usr/local/bin/node /opt/ipvolt-mcp/current/dist/transports/http.js
+Restart=on-failure
+RestartSec=3
+TimeoutStartSec=20
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+SystemCallArchitectures=native
+# Replies to accepted Caddy connections remain possible, but new outbound
+# connections (including connections to other loopback apps) are unnecessary.
+SystemCallFilter=~connect @mount
+SystemCallErrorNumber=EPERM
+IPAddressDeny=any
+IPAddressAllow=localhost
+SocketBindDeny=any
+SocketBindAllow=ipv4:tcp:3040
+InaccessiblePaths=-/opt/ipvolt-website -/opt/ipvolt-admin -/opt/ipvolt-board -/var/lib/postgresql -/var/lib/ipvolt-telegram -/var/lib/ipvolt-agent -/var/lib/ipvolt-mcp-deploy
+MemoryMax=256M
+MemorySwapMax=0
+TasksMax=64
+CPUQuota=50%
+LimitNOFILE=256
+LimitCORE=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ipvolt-mcp
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=300
+
+[Install]
+WantedBy=multi-user.target
