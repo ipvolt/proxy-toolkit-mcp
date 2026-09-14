@@ -1,0 +1,83 @@
+name: Publish reviewed npm-only MCP Registry release
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_commit:
+        description: Full reviewed metadata commit tagged registry-npm-v0.1.0
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: official-mcp-registry-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'ipvolt/proxy-toolkit-mcp'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      REVIEWED_COMMIT: ${{ inputs.reviewed_commit }}
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Check out the exact manually selected metadata revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test publication guards
+        run: python3 -m unittest discover -s registry/npm -p 'test_*.py' -v
+      - name: Verify frozen source, manifest, public npm artifact and unused Registry version
+        run: python3 registry/npm/check.py prepublish
+      - name: Download and verify the official publisher
+        shell: bash
+        run: |
+          set -euo pipefail
+          publisher_dir="$RUNNER_TEMP/ipvolt-mcp-publisher"
+          mkdir -m 700 "$publisher_dir"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --connect-timeout 15 --max-time 120 --max-filesize 20971520 \
+            --output "$publisher_dir/publisher.tar.gz" \
+            'https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz'
+          printf '%s  %s\n' \
+            'a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc' \
+            "$publisher_dir/publisher.tar.gz" | sha256sum --check --status
+          tar --extract --gzip --file "$publisher_dir/publisher.tar.gz" \
+            --directory "$publisher_dir" --no-same-owner --no-same-permissions mcp-publisher
+          "$publisher_dir/mcp-publisher" --version
+      - name: Validate, authenticate with GitHub OIDC, and publish once
+        id: publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          publisher="$RUNNER_TEMP/ipvolt-mcp-publisher/mcp-publisher"
+          # Publisher 1.8.1 stores tokens here, outside the repository. Refuse old state.
+          test ! -e "$HOME/.config/mcp-publisher"
+          mkdir -p "$HOME/.config"
+          mkdir -m 700 "$HOME/.config/mcp-publisher"
+          trap 'rm -f -- "$HOME/.config/mcp-publisher/token.json"; rmdir -- "$HOME/.config/mcp-publisher"' EXIT
+          timeout --kill-after=5s 90s "$publisher" validate registry/npm/server.json
+          # Repeat the read-only guard immediately before obtaining publication authority.
+          python3 registry/npm/check.py prepublish
+          # Upstream auth errors can contain response bodies; keep them out of job logs.
+          if ! timeout --kill-after=5s 90s "$publisher" login github-oidc \
+            --registry https://registry.modelcontextprotocol.io > /dev/null 2>&1; then
+            printf '%s\n' 'GitHub OIDC authentication failed.' >&2
+            exit 1
+          fi
+          printf '%s\n' 'GitHub OIDC authentication succeeded.'
+          # No publish retry: an uncertain result must be resolved by public read-back.
+          printf 'attempted=true\n' >> "$GITHUB_OUTPUT"
+          if ! timeout --kill-after=5s 120s "$publisher" publish registry/npm/server.json > /dev/null 2>&1; then
+            printf '%s\n' 'Registry publication did not report success. Inspect the exact-version read-back before any retry.' >&2
+            exit 1
+          fi
+          printf '%s\n' 'Registry publication reported success.'
+      - name: Read back the exact active Registry version
+        if: always() && steps.publication.outputs.attempted == 'true'
+        run: python3 registry/npm/check.py read-back

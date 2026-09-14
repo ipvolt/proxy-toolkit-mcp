@@ -1,0 +1,75 @@
+{
+  "publishedPackage": "https://www.npmjs.com/package/@ipvolt/proxy-toolkit-mcp",
+  "sourceRelease": "https://github.com/ipvolt/proxy-toolkit-mcp/releases/tag/v0.1.0",
+  "sourceCommit": "7660651b2ee22866db5fa70e3d2b3dee68760c43",
+  "ci": "https://github.com/ipvolt/proxy-toolkit-mcp/actions/runs/34843987983",
+  "initialPublishProvenance": false,
+  "publicMetadata": {
+    "metadata_url": "https://registry.npmjs.org/@ipvolt%2fproxy-toolkit-mcp/0.1.0",
+    "name": "@ipvolt/proxy-toolkit-mcp",
+    "version": "0.1.0",
+    "mcpName": "io.github.ipvolt/proxy-toolkit",
+    "repository": "git+https://github.com/ipvolt/proxy-toolkit-mcp.git",
+    "homepage": "https://ipvolt.com",
+    "integrity": "sha512-ubn8Tv3ROGwkN6kln8gEJ98qF+7x1r/QIAobCacJ+1X4cV/WOISSg95rgVDfBW379KiXMQmIlLvWC24nAR8t7A==",
+    "sha256": "4848d77611d09a004454577e9a2f3316c420bcbca3a33633ae8a43876ec48f81",
+    "bytes": 107580,
+    "maintainers": [
+      "ipvolt"
+    ],
+    "matches_reviewed_archive": true
+  },
+  "publicConsumer": {
+    "checkedAt": "2026-09-14T12:48:23.429Z",
+    "source": "anonymous fresh npm install by exact package version",
+    "package": "@ipvolt/proxy-toolkit-mcp",
+    "version": "0.1.0",
+    "node": "v24.20.0",
+    "binVersion": "0.1.0",
+    "localRouteToolAbsent": true,
+    "stdoutProtocolOnly": true,
+    "stderrEmpty": true,
+    "results": [
+      {
+        "protocol": "2025-11-25",
+        "tool": "search_proxy_docs",
+        "ok": true
+      },
+      {
+        "protocol": "2025-11-25",
+        "tool": "get_proxy_doc",
+        "ok": true
+      },
+      {
+        "protocol": "2025-11-25",
+        "tool": "generate_proxy_config",
+        "ok": true
+      },
+      {
+        "protocol": "2025-11-25",
+        "tool": "diagnose_proxy_error",
+        "ok": true
+      },
+      {
+        "protocol": "2026-07-28",
+        "tool": "search_proxy_docs",
+        "ok": true
+      },
+      {
+        "protocol": "2026-07-28",
+        "tool": "get_proxy_doc",
+        "ok": true
+      },
+      {
+        "protocol": "2026-07-28",
+        "tool": "generate_proxy_config",
+        "ok": true
+      },
+      {
+        "protocol": "2026-07-28",
+        "tool": "diagnose_proxy_error",
+        "ok": true
+      }
+    ]
+  }
+}
