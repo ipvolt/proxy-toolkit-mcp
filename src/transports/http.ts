@@ -1,7 +1,8 @@
 import { createHmac, randomBytes } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { isIP } from 'node:net';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import { createToolkitServer, type ToolMetric } from '../server.js';
@@ -177,6 +178,11 @@ function start():void {
   service.server.on('error',()=>{process.stderr.write('MCP HTTP listener failed.\n');process.exitCode=1;void service.close();});
   for(const signal of ['SIGINT','SIGTERM'] as const)process.once(signal,()=>void service.close().then(()=>process.exit(0)));
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
+let isEntrypoint=false;
+try {
+  // Deployment invokes /current, while ESM normally resolves its release symlink.
+  isEntrypoint=process.argv[1]!==undefined&&realpathSync(process.argv[1])===realpathSync(fileURLToPath(import.meta.url));
+}catch{ /* An importing process may not have a filesystem entrypoint. */ }
+if(isEntrypoint){
   try{start();}catch{process.stderr.write('Unable to start MCP HTTP service. Check the documented configuration.\n');process.exitCode=1;}
 }
