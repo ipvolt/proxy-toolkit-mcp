@@ -275,9 +275,13 @@ class Host:
         name = f"ipvolt-mcp-candidate-{manifest['release']}.service"
         candidate_unit = paths.at("run/systemd/system") / name
         if candidate_unit.exists() or candidate_unit.is_symlink(): raise DeploymentError("Unexpected candidate unit already exists.")
-        content = unit.replace(str(paths.current), str(target)).replace("/etc/ipvolt-mcp.env", "-unused")
+        candidate_link = paths.at("run") / f"ipvolt-mcp-candidate-{manifest['release']}"
+        if candidate_link.exists() or candidate_link.is_symlink(): raise DeploymentError("Unexpected candidate release link already exists.")
+        # Exercise the same symlink entrypoint semantics as the live current link.
+        content = unit.replace(str(paths.current), str(candidate_link)).replace("/etc/ipvolt-mcp.env", "-unused")
         content = content.replace("EnvironmentFile=-unused", "Environment=NODE_ENV=production\nEnvironment=IPVOLT_MCP_TRUST_PROXY=1\nEnvironment=IPVOLT_MCP_PUBLIC_URL=https://mcp.ipvolt.com/mcp\nEnvironment=IPVOLT_MCP_ALLOWED_ORIGINS=https://mcp.ipvolt.com,https://ipvolt.com\nEnvironment=IPVOLT_MCP_PORT=" + str(port)).replace("ipv4:tcp:3040", f"ipv4:tcp:{port}")
         try:
+            atomic_link(candidate_link, target)
             atomic_file(candidate_unit, content.encode())
             self.run(["systemd-analyze", "verify", str(candidate_unit)])
             self.run(["systemctl", "daemon-reload"]); self.unit_boundary(name, candidate_unit); self.run(["systemctl", "start", name])
@@ -285,6 +289,7 @@ class Host:
         finally:
             self.run(["systemctl", "stop", name], False)
             candidate_unit.unlink(missing_ok=True)
+            candidate_link.unlink(missing_ok=True)
             self.run(["systemctl", "daemon-reload"])
 
     def public_health(self):

@@ -157,6 +157,38 @@ class ReleaseTests(unittest.TestCase):
         self.assertFalse(self.paths.env.exists())
         self.assertFalse(self.paths.unit.exists())
 
+    def test_candidate_uses_release_symlink_and_cleans_it_on_health_failure(self):
+        manifest = self.stage()
+        target = self.paths.releases / "first"
+        unit = (target / "deploy/ipvolt-mcp.service").read_text().replace("/opt/ipvolt-mcp/current", str(self.paths.current))
+        candidate_unit = self.paths.at("run/systemd/system/ipvolt-mcp-candidate-first.service")
+        candidate_link = self.paths.at("run/ipvolt-mcp-candidate-first")
+        host = deploy.Host()
+
+        def check_candidate(*_args):
+            self.assertTrue(candidate_link.is_symlink())
+            self.assertEqual(candidate_link.resolve(), target)
+            self.assertIn(f"WorkingDirectory={candidate_link}", candidate_unit.read_text())
+            self.assertIn(f"{candidate_link}/dist/transports/http.js", candidate_unit.read_text())
+            self.assertFalse(self.paths.current.exists())
+            raise deploy.DeploymentError("Controlled candidate health failure")
+
+        with patch.object(host, "run", return_value=subprocess.CompletedProcess([], 0, "", "")), patch.object(host, "health", side_effect=check_candidate):
+            with self.assertRaisesRegex(deploy.DeploymentError, "Controlled candidate health failure"):
+                host.candidate(self.paths, target, unit, manifest)
+        self.assertFalse(candidate_unit.exists())
+        self.assertFalse(candidate_link.exists() or candidate_link.is_symlink())
+        self.assertFalse(self.paths.current.exists())
+
+    def test_existing_candidate_link_is_preserved(self):
+        manifest = self.stage()
+        candidate_link = self.paths.at("run/ipvolt-mcp-candidate-first")
+        candidate_link.symlink_to(self.root / "missing-operator-target")
+        with self.assertRaisesRegex(deploy.DeploymentError, "candidate release link"):
+            deploy.Host().candidate(self.paths, self.paths.releases / "first", "", manifest)
+        self.assertTrue(candidate_link.is_symlink())
+        self.assertEqual(candidate_link.readlink(), self.root / "missing-operator-target")
+
     def test_validate_runs_candidate_without_dns_or_active_state_mutation(self):
         manifest = self.stage()
         def no_public_action(*_args): raise AssertionError("Inactive validation must not check DNS or public TLS.")
