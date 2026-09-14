@@ -1,0 +1,61 @@
+{
+  "url": "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.ipvolt%2Fproxy-toolkit/versions/0.1.0",
+  "workflow": "https://github.com/ipvolt/proxy-toolkit-mcp/actions/runs/34846480414",
+  "metadataCommit": "7c21c2b81dc9a75759e556d6611bcb017fdc540b",
+  "metadataTag": "registry-npm-v0.1.0",
+  "sourceRelease": "https://github.com/ipvolt/proxy-toolkit-mcp/releases/tag/v0.1.0",
+  "npmPackage": "https://www.npmjs.com/package/@ipvolt/proxy-toolkit-mcp",
+  "readback": {
+    "server": {
+      "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+      "name": "io.github.ipvolt/proxy-toolkit",
+      "description": "Proxy guides, tested configurations and error diagnostics, with an optional local route check.",
+      "title": "ipvolt Proxy Toolkit",
+      "repository": {
+        "url": "https://github.com/ipvolt/proxy-toolkit-mcp",
+        "source": "github"
+      },
+      "version": "0.1.0",
+      "websiteUrl": "https://ipvolt.com",
+      "packages": [
+        {
+          "registryType": "npm",
+          "registryBaseUrl": "https://registry.npmjs.org",
+          "identifier": "@ipvolt/proxy-toolkit-mcp",
+          "version": "0.1.0",
+          "runtimeHint": "npx",
+          "transport": {
+            "type": "stdio"
+          },
+          "environmentVariables": [
+            {
+              "description": "Optional local route diagnostic. Set 1 only when you want the extra tool to make a bounded request through your configured proxy.",
+              "format": "string",
+              "default": "0",
+              "choices": [
+                "0",
+                "1"
+              ],
+              "name": "IPVOLT_ENABLE_ROUTE_CHECK"
+            },
+            {
+              "description": "Private HTTP proxy URL, required only when the local route diagnostic is enabled. Supply through the client's local secret environment; never as a tool argument.",
+              "format": "string",
+              "isSecret": true,
+              "name": "IPVOLT_PROXY_URL"
+            }
+          ]
+        }
+      ]
+    },
+    "_meta": {
+      "io.modelcontextprotocol.registry/official": {
+        "status": "active",
+        "statusChangedAt": "2026-09-14T12:59:25.378497Z",
+        "publishedAt": "2026-09-14T12:59:25.378497Z",
+        "updatedAt": "2026-09-14T12:59:25.378497Z",
+        "isLatest": true
+      }
+    }
+  }
+}
