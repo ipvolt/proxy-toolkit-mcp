@@ -1,6 +1,6 @@
 # Toolkit distribution status
 
-As of 14 September 2026, the source repository, npm package, hosted endpoint, official MCP Registry entry and Smithery listing are public. Glama submissions await moderation. The website landing is prepared for a selected release batch.
+As of 14 September 2026, the source repository, npm package, hosted endpoint, official MCP Registry entry and Smithery listing are public. Glama submissions await moderation. The website landing and its Markdown version are public.
 
 | Channel | Verified state | Remaining dependency |
 | --- | --- | --- |
@@ -11,7 +11,7 @@ As of 14 September 2026, the source repository, npm package, hosted endpoint, of
 | [Smithery](https://smithery.ai/servers/ipvolt/proxy-toolkit) | Public listing and all four tools visible without signing in | Metadata save returned a permission error; gateway requires Smithery authorization |
 | Glama | Source and remote submitted once each on 14 September 2026 | Moderation pending; no public listing URL has been issued |
 | PulseMCP | Submission pause confirmed in its browser page on 14 September 2026 | Wait for its submission process to reopen |
-| Website `/mcp` and `/mcp.md` | Reviewed and tested candidate | Select and freeze a website release batch |
+| [Website landing](https://ipvolt.com/mcp) and [Markdown](https://ipvolt.com/mcp.md) | Live; public HTML and Markdown verified on 14 September 2026 | None for the initial release |
 
 Update channel states only from actual read-back. Direct endpoint tests do not establish directory gateway compatibility, and directory publication does not establish search indexing or traffic gains.
 
