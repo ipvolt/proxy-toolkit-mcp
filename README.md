@@ -6,7 +6,7 @@ The toolkit is separate from ipvolt's commercial proxy service, which is not ope
 
 ## Availability
 
-Version 0.1.0 provides four local tools using a bundled public catalog. Check [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md) for verified npm availability, the hosted endpoint and registry listings. Source builds work independently of those distribution channels. Registry metadata in `server.json` describes the intended release and is not evidence that a channel is live.
+The published npm version 0.1.0 and public hosted service provide four tools using a bundled public catalog. Check [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md) for verified npm availability, the hosted endpoint and registry listings. Source builds work independently of those distribution channels. Registry metadata in `server.json` describes the intended release and is not evidence that a channel is live.
 
 ## Tools
 
@@ -88,7 +88,7 @@ The diagnostic requires the hosted echo service to be available. Check release s
 
 ## Hosted service
 
-The planned remote URL is `https://mcp.ipvolt.com/mcp`, using Streamable HTTP. It exposes the four public tools without signup or an API key. The local route diagnostic is omitted and direct attempts to call it are rejected. No proxy configuration is accepted by this service.
+The public remote URL is `https://mcp.ipvolt.com/mcp`, using Streamable HTTP. Select that transport in your MCP client and enter the URL. Public HTTPS, all four tools on both supported protocol versions, and the echo endpoint were verified on 14 September 2026; see [hosted verification](docs/hosted-publication-2026-09-14.json). It exposes the four public tools without signup or an API key. The local route diagnostic is omitted and direct attempts to call it are rejected. No proxy configuration is accepted by this service.
 
 For a local development instance:
 
