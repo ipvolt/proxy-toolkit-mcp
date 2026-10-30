@@ -5,7 +5,14 @@
   "type": "module",
   "license": "MIT",
   "mcpName": "io.github.ipvolt/proxy-toolkit",
-  "keywords": ["mcp", "proxy", "curl", "httpx", "playwright", "diagnostics"],
+  "keywords": [
+    "mcp",
+    "proxy",
+    "curl",
+    "httpx",
+    "playwright",
+    "diagnostics"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/ipvolt/proxy-toolkit-mcp.git"
@@ -44,11 +51,11 @@
   },
   "dependencies": {
     "@modelcontextprotocol/node": "2.0.0",
-    "@modelcontextprotocol/server": "2.0.0",
-    "zod": "4.6.5"
+    "@modelcontextprotocol/server": "2.4.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/client": "2.4.0",
     "@types/node": "24.13.4",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
