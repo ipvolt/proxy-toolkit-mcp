@@ -1,5 +1,7 @@
 # BEGIN IPVOLT MCP MANAGED
 mcp.ipvolt.com {
+    # Task541: HTTPS persistence for this hostname only. No subdomains/preload.
+    header Strict-Transport-Security "max-age=86400"
     # Request arguments, diagnostic nonces and visitor addresses are not access logs.
     log_skip
     header X-Robots-Tag "noindex, nofollow"
