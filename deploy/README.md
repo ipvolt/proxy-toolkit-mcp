@@ -12,6 +12,8 @@ The unit applies filesystem/process/resource restrictions, denies nonloopback IP
 
 Caddy overwrites `X-IPVolt-Peer` with `{http.request.remote.host}`, the actual connection peer. It does not trust supplied forwarding headers for the echo address. Putting a CDN or another external reverse proxy in front changes the observed peer and requires a separately reviewed design. `log_skip` disables access logging for this hostname; no request arguments, query strings, diagnostic IPs or nonces are application metrics. The application emits bounded JSON tool metrics and startup information. Do not enable request/debug logging. `handle_errors` produces a fixed response instead of exposing proxy failure detail.
 
+The hostname also sends `Strict-Transport-Security: max-age=86400`, matching the live site block: a one-day policy for this HTTPS hostname only, without `includeSubDomains` or preload. Activation replaces the whole managed block with this template, so a template without the line would remove the header. Review any change to it separately. Removing the header does not clear the policy browsers already hold, so keep HTTPS valid on the hostname for at least a day after such a change.
+
 Prepare a clean runtime artifact from the reviewed revision as an unprivileged build account. Use Node 24, run the repository's build and checks, inspect the npm package separately, and copy only the following into a new artifact directory:
 
 ```text

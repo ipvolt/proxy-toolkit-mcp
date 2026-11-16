@@ -269,6 +269,8 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("@public_mcp path /mcp /egress", caddy)
         self.assertNotIn("/healthz", caddy)
         self.assertIn("log_skip", caddy)
+        hsts = [line.strip() for line in caddy.splitlines() if "Strict-Transport-Security" in line]
+        self.assertEqual(hsts, ['header Strict-Transport-Security "max-age=86400"'])
 
     def test_bounded_json_and_sse_discovery(self):
         response = {"jsonrpc": "2.0", "id": 1, "result": {"tools": []}}
