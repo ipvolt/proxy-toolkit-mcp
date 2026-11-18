@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, rm, writeFile, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -25,6 +25,7 @@ environment.PATH = dirname(process.execPath) + delimiter + (process.env.PATH ?? 
 delete environment.NODE_AUTH_TOKEN;
 delete environment.NPM_TOKEN;
 const expected = ['diagnose_proxy_error', 'generate_proxy_config', 'get_proxy_doc', 'search_proxy_docs'];
+const account = ['extend_rental', 'get_balance', 'get_rental', 'list_rentals', 'list_stock', 'rent_proxy', 'rotate_ip'];
 try {
   const { stdout } = await run('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', temp], { cwd: root, env: environment });
   const [packed] = JSON.parse(stdout);
@@ -67,8 +68,23 @@ try {
       assert.equal(stderr, '');
     } finally { await client.close(); }
   }
+  {
+    // An API key adds the seven account tools. Discovery makes no request; the base is unreachable on purpose.
+    const client = new Client({ name: 'isolated-package-check', version: '1.0.0' });
+    const transport = new StdioClientTransport({
+      command: process.execPath, args: [join(clean, 'node_modules', pkg.name, pkg.bin['ipvolt-proxy-toolkit'])], cwd: clean, stderr: 'pipe',
+      env: { IPVOLT_API_KEY: 'ipvolt_' + randomBytes(32).toString('base64url'), IPVOLT_API_BASE: 'http://127.0.0.1:9' },
+    });
+    let stderr = '';
+    transport.stderr?.on('data', (data) => { stderr += data.toString(); });
+    try {
+      await client.connect(transport);
+      assert.deepEqual((await client.listTools()).tools.map((tool) => tool.name).sort(), [...expected, ...account].sort());
+      assert.equal(stderr, '');
+    } finally { await client.close(); }
+  }
   const sha256 = createHash('sha256').update(await readFile(tarball)).digest('hex');
-  const report = { ok: true, name: pkg.name, version: pkg.version, filename: packed.filename, sha256, integrity: packed.integrity, files: packed.files.length, unpackedBytes: packed.unpackedSize, node: process.version, protocols: ['2025-11-25', '2026-07-28'], toolCalls: 8 };
+  const report = { ok: true, name: pkg.name, version: pkg.version, filename: packed.filename, sha256, integrity: packed.integrity, files: packed.files.length, unpackedBytes: packed.unpackedSize, node: process.version, protocols: ['2025-11-25', '2026-07-28'], toolCalls: 8, accountToolsListedWithKey: account.length };
   if (output) {
     await mkdir(output, { recursive: true });
     await copyFile(tarball, join(output, packed.filename));
