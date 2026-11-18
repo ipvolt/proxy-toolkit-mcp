@@ -398,7 +398,7 @@ export function registerAccountTools(server: McpServer, tools: AccountTools, onT
       const priceMinor = best.priceMinor!;
       const totalMinor = priceMinor * quantity;
       const id = previews.add({ kind: 'rent', offer: best, quantity, priceMinor, currency });
-      const summary = `Renting ${quantity} × ${best.country} ${best.carrier} for ${length(best.days)} will charge ${money(totalMinor, currency)}${quantity > 1 ? ` (${money(priceMinor, currency)} each)` : ''} from your balance${allowance(best.includedGb)}. Nothing has been charged yet. To proceed, call rent_proxy again with confirm: true and requestId: ${id}`;
+      const summary = `Renting ${quantity} × ${best.country} ${best.carrier} for ${length(best.days)} will charge ${money(totalMinor, currency)}${quantity > 1 ? ` (${money(priceMinor, currency)} each)` : ''} from your balance${quantity > 1 && best.includedGb !== undefined ? ` (each includes ${best.includedGb} GB of data)` : allowance(best.includedGb)}. Nothing has been charged yet. To proceed, call rent_proxy again with confirm: true and requestId: ${id}`;
       return ok({ summary, stage: 'preview', requestId: id, offer: best, quantity, priceMinor, totalMinor, currency },
         `${summary}\nAsk the user to approve this charge first. If the price rises before you confirm, the API refuses the rental instead of charging more. The preview expires in 15 minutes.`);
     }
