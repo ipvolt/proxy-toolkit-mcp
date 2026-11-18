@@ -5,7 +5,7 @@ As of 14 September 2026, the source repository, npm package, hosted endpoint, of
 | Channel | Verified state | Remaining dependency |
 | --- | --- | --- |
 | [Source repository](https://github.com/ipvolt/proxy-toolkit-mcp) | Public; npm source tagged [`v0.1.0`](https://github.com/ipvolt/proxy-toolkit-mcp/releases/tag/v0.1.0) | None for the initial release |
-| [npm `@ipvolt/proxy-toolkit-mcp`](https://www.npmjs.com/package/@ipvolt/proxy-toolkit-mcp) | Version `0.1.0` published; exact archive and fresh installation verified | None; [evidence](npm-publication-2026-09-14.json) |
+| [npm `@ipvolt/proxy-toolkit-mcp`](https://www.npmjs.com/package/@ipvolt/proxy-toolkit-mcp) | Version `0.2.0` published on 18 November 2026 through GitHub Actions OIDC trusted publishing, with an SLSA provenance statement; a fresh installation lists the four tools without a key and eleven with `IPVOLT_API_KEY`. `0.1.0` stays published | None; [evidence](npm-publication-2026-09-14.json) |
 | Hosted MCP and echo | `https://mcp.ipvolt.com/mcp` live; trusted TLS and all four tools verified | None; [evidence](hosted-publication-2026-09-14.json) |
 | [Official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.ipvolt%2Fproxy-toolkit/versions/0.1.1) | Version `0.1.1` active and latest, with the verified remote and npm `0.1.0` | None; [publication evidence](../registry/hosted/publication-2026-09-14.json) |
 | [Smithery](https://smithery.ai/servers/ipvolt/proxy-toolkit) | Public listing and all four tools visible without signing in | Metadata save returned a permission error; gateway requires Smithery authorization |
@@ -14,6 +14,10 @@ As of 14 September 2026, the source repository, npm package, hosted endpoint, of
 | [Website landing](https://ipvolt.com/mcp) and [Markdown](https://ipvolt.com/mcp.md) | Live; public HTML and Markdown verified on 14 September 2026 | None for the initial release |
 
 Update channel states only from actual read-back. Direct endpoint tests do not establish directory gateway compatibility, and directory publication does not establish search indexing or traffic gains.
+
+## Version 0.2.0
+
+Adds seven optional account tools for local stdio installs with `IPVOLT_API_KEY`: `list_stock`, `get_balance`, `list_rentals`, `get_rental`, `rotate_ip`, `rent_proxy` and `extend_rental`. Source tag [`v0.2.0`](https://github.com/ipvolt/proxy-toolkit-mcp/releases/tag/v0.2.0); published by the [publish workflow](https://github.com/ipvolt/proxy-toolkit-mcp/actions/workflows/publish.yml) through the package's npm trusted publisher (`publish.yml`, environment `npm`, publish only), with provenance. The hosted service and the official MCP Registry entry (`0.1.1`, npm `0.1.0`) are unchanged; a Registry version for npm `0.2.0` is not published yet.
 
 ## npm artifact and clients
 
