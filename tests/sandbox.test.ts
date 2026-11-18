@@ -513,7 +513,12 @@ test('the network guard refuses every way out of the process, not only fetch', {
       'dgram.send': async () => (await import('node:dgram')).createSocket('udp4').send('x', 9, '127.0.0.1'),
       'dgram.bind': async () => (await import('node:dgram')).createSocket('udp4').bind(0),
       'child_process.spawn': async () => (await import('node:child_process')).spawn(process.execPath, ['--version']),
+      'child_process.spawnSync': async () => (await import('node:child_process')).spawnSync(process.execPath, ['--version']),
+      'child_process.exec': async () => (await import('node:child_process')).exec('true'),
+      'child_process.execSync': async () => (await import('node:child_process')).execSync('true'),
+      'child_process.execFile': async () => (await import('node:child_process')).execFile(process.execPath, ['--version']),
       'child_process.execFileSync': async () => (await import('node:child_process')).execFileSync(process.execPath, ['--version']),
+      'ChildProcess.spawn': async () => new (await import('node:child_process')).ChildProcess().spawn({ file: process.execPath, args: [process.execPath, '--version'], stdio: 'ignore' }),
       'child_process.fork': async () => (await import('node:child_process')).fork('nothing.mjs'),
       'worker_threads.Worker': async () => new (await import('node:worker_threads')).Worker('1', { eval: true }),
       'WebSocket': () => new WebSocket('ws://127.0.0.1:9/'),
@@ -525,9 +530,9 @@ test('the network guard refuses every way out of the process, not only fetch', {
     process.exit(0);`;
   const { stdout, stderr } = await run(process.execPath, ['--import', guard, '--input-type=module', '-e', probe], { cwd: root, env: { PATH: process.env.PATH ?? '' }, timeout: 15_000 });
   const lines = stdout.trim().split('\n');
-  assert.equal(lines.length, 20);
+  assert.equal(lines.length, 25);
   assert.deepEqual(lines.filter(line => !line.startsWith('REFUSED ')), [], stdout);
-  assert.equal(stderr.trim().split('\n').filter(line => line.startsWith('NETWORK ATTEMPT: ')).length, 20, stderr);
+  assert.equal(stderr.trim().split('\n').filter(line => line.startsWith('NETWORK ATTEMPT: ')).length, 25, stderr);
 });
 
 test('sandbox source: sample data holds no key-shaped value and only reserved names and addresses', () => {

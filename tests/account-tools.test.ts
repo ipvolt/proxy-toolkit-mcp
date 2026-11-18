@@ -555,6 +555,34 @@ test('connection details appear only in rental results, never in errors or stder
   } finally { await mcp.close(); await fake.close(); }
 });
 
+test('fields the API answers as null are left out, not treated as a malformed answer', { timeout: 20_000 }, async () => {
+  const fake = await fakeApi();
+  const mcp = await session(fake);
+  try {
+    // A device without an order, place or end time, as the API describes it.
+    const bare = { id: RENTAL, orderId: null, status: 'active', country: null, countryName: null, carrier: null, endsAt: null, online: false, externalIp: null, canRotate: false, canExtend: true, connection: {} };
+    fake.state.override = request => request.method !== 'GET' ? undefined
+      : request.path === '/rentals' ? { status: 200, body: { rentals: [bare] } }
+      : request.path === `/rentals/${RENTAL}` ? { status: 200, body: bare }
+      : request.path === `/rentals/${RENTAL}/extension-price?days=30` ? { status: 200, body: { rentalId: RENTAL, days: 30, priceMinor: 10000, price: '100.00', currency: 'USD', endsAt: null } }
+      // The stock feed has not been read: no offers, no observation time, purchases closed.
+      : request.path === '/stock' ? { status: 200, body: { currency: 'USD', observedAt: null, purchasesOpen: false, offers: [] } }
+      : undefined;
+    const listed = await mcp.call('list_rentals');
+    assert.deepEqual(okOf(listed).rentals, [{ id: RENTAL, status: 'active', online: false, externalIp: null, canRotate: false, canExtend: true }]);
+    assert.match(text(listed), new RegExp(`Rental ${RENTAL}, active, offline, cannot rotate, can extend\\.`));
+    assert.deepEqual(okOf(await mcp.call('get_rental', { rentalId: RENTAL })).rental, okOf(listed).rentals[0]);
+    const preview = okOf(await mcp.call('extend_rental', { rentalId: RENTAL, days: 30 }));
+    assert.equal(preview.priceMinor, 10000);
+    assert.equal(preview.endsAt, undefined);
+    const stock = await mcp.call('list_stock');
+    assert.deepEqual({ offers: okOf(stock).offers, purchasesOpen: okOf(stock).purchasesOpen, observedAt: okOf(stock).observedAt }, { offers: [], purchasesOpen: false, observedAt: undefined });
+    assert.match(text(stock), /No in-stock offers right now\. Purchases are closed right now\./);
+    assert.equal(errorOf(await mcp.call('rent_proxy', { country: 'US', carrier: 'Verizon', days: 30 })).code, 'offer_not_found');
+    await mcp.finish();
+  } finally { await mcp.close(); await fake.close(); }
+});
+
 test('an interrupted rent confirm reports an unknown outcome and a repeat reuses the same Idempotency-Key', { timeout: 20_000 }, async () => {
   const fake = await fakeApi();
   const mcp = await session(fake);

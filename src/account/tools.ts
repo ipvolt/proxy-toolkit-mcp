@@ -100,7 +100,9 @@ const apiOffer = z.object({
   country: text(8), countryName: text(120).optional(), carrier: text(120), days: z.number().int(),
   priceMinor: minor.nullable(), available: z.boolean(), includedGb: z.number().nonnegative().optional(),
 });
-const apiStock = z.object({ currency: text(8).optional(), observedAt: text(40).optional(), purchasesOpen: z.boolean().optional(), offers: z.array(apiOffer).max(10_000) });
+// The API answers null, not an absent field, where it has no value: observedAt while the stock feed is unread, and a rental's
+// order, country, carrier or end time when the device has none. The mappers below leave such fields out.
+const apiStock = z.object({ currency: text(8).optional(), observedAt: text(40).nullish(), purchasesOpen: z.boolean().optional(), offers: z.array(apiOffer).max(10_000) });
 const apiKey = z.object({
   name: text(128).optional(), access: text(32), dailyLimitMinor: minor.nullable().optional(), spentTodayMinor: minor.optional(),
   remainingTodayMinor: z.number().int().nullable().optional(), dayResetsAt: text(40).optional(), expiresAt: text(40).optional(),
@@ -109,8 +111,8 @@ const cents = z.union([z.string().regex(/^-?\d{1,15}$/).transform(Number), z.num
 const apiBalance = z.object({ currency: text(8).optional(), availableMinor: cents, heldMinor: cents.optional() });
 const apiEndpoint = z.object({ host: text(255), port: z.number().int().min(1).max(65_535), username: text(512), password: text(512) });
 const apiRental = z.object({
-  id: text(128), orderId: text(128).optional(), status: text(40),
-  country: text(8).optional(), countryName: text(120).optional(), carrier: text(120).optional(), endsAt: text(40).optional(),
+  id: text(128), orderId: text(128).nullish(), status: text(40),
+  country: text(8).nullish(), countryName: text(120).nullish(), carrier: text(120).nullish(), endsAt: text(40).nullish(),
   online: z.boolean().optional(), externalIp: text(64).nullable().optional(), canRotate: z.boolean().optional(), canExtend: z.boolean().optional(),
   includedGb: z.number().nonnegative().optional(),
   connection: z.object({ http: apiEndpoint.optional(), socks5: apiEndpoint.optional() }).optional(),
@@ -120,7 +122,7 @@ const apiOrder = z.object({
   orderId: text(128), status: text(40), replayed: z.boolean().optional(), chargedMinor: minor, currency: text(8).optional(),
   rentalIds: z.array(text(128)).max(100).optional(), rentalId: text(128).optional(), days: z.number().int().optional(),
 });
-const apiPrice = z.object({ days: z.number().int().optional(), priceMinor: minor, currency: text(8).optional(), endsAt: text(40).optional() });
+const apiPrice = z.object({ days: z.number().int().optional(), priceMinor: minor, currency: text(8).optional(), endsAt: text(40).nullish() });
 const apiRotation = z.object({ rotated: z.boolean().optional(), pending: z.boolean().optional(), ip: text(64).nullable().optional(), message: text(1000).optional() });
 
 /* ---------------------------------------------------------------- helpers */

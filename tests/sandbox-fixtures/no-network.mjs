@@ -32,5 +32,6 @@ refuseAll(dns.promises.Resolver.prototype, 'dns.promises.Resolver', (name) => !r
 for (const name of ['bind', 'connect', 'send']) dgram.Socket.prototype[name] = refuse(`dgram.${name}`);
 // Another process or thread would not carry these patches.
 for (const name of ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork']) childProcess[name] = refuse(`child_process.${name}`);
+childProcess.ChildProcess.prototype.spawn = refuse('ChildProcess.spawn');
 workerThreads.Worker = refuse('worker_threads.Worker');
 syncBuiltinESMExports();
