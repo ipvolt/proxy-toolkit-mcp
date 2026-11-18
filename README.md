@@ -126,18 +126,18 @@ claude mcp add ipvolt-sandbox -e IPVOLT_SANDBOX=1 -- npx --yes @ipvolt/proxy-too
 
 Then ask the assistant to list the stock, rent a proxy, show its connection details, rotate its IP and extend it.
 
-- **Nothing is real.** In sandbox mode the server sends no network request, reads no key and stores nothing. No proxy is rented and nothing is charged. Restarting the server resets the account.
-- **Every answer says so.** A successful answer starts with a `SANDBOX:` line. Every structured result has `sandbox: true` and a summary that starts `Sandbox (simulated):`. Tool titles end in "(sandbox)", and each description starts with `SANDBOX MODE` before it says what the tool does with a real key.
+- **Nothing is real.** A server in sandbox mode sends no network request, reads no key and stores nothing. No proxy is rented and nothing is charged. Restarting the server resets the account.
+- **Every answer from an account tool says so.** A successful answer starts with a `SANDBOX:` line. Every structured result, success or refusal, has `sandbox: true` and a summary that starts `Sandbox (simulated):`. Tool titles end in "(sandbox)", and each description starts with `SANDBOX MODE` before it says what the tool does with a real key. A call with arguments the tool does not accept never reaches the tool: it gets the short protocol error, which has nothing simulated in it.
 - **The account.** It starts with a pretend balance of $500.00 and no rentals. Its key is read-write and has no daily limit.
-- **Stock and prices are samples.** `list_stock` returns twelve sample offers, a subset of the public list on 18 November 2026, with one marked sold out. They are not live. Current prices are at [ipvolt.com/pricing](https://ipvolt.com/pricing).
-- **Renting and extending** take the same two steps as with a key: a preview with the charge and a `requestId`, then `confirm: true`. Repeating a confirm returns the same order and charges the pretend balance once. A new rental is in `list_rentals` at once; a real device takes minutes to set up.
+- **Stock and prices are samples.** `list_stock` returns eleven sample offers in stock, and a twelfth that is sold out when you pass `includeSoldOut: true`. They are a subset of the public list on 18 November 2026 and are not live. Current prices are at [ipvolt.com/pricing](https://ipvolt.com/pricing).
+- **Renting and extending** take the same two steps as with a key: a preview with the charge and a `requestId`, then `confirm: true`. Repeating a confirm returns the same order, now `fulfilled` and with its rental ids, and charges the pretend balance once. A new rental is in `list_rentals` at once; a real device takes minutes to set up.
 - **Simulated rentals connect to nothing.** Their ids start with `sandbox-`. The host is `proxy.sandbox.invalid`, which cannot resolve. The usernames and passwords are made up when the rental is created, and the IP addresses come from the blocks reserved for documentation.
 - **Rotating** gives the rental a new simulated address. A second rotation within 30 seconds is refused with `rotation_cooldown` and the seconds to wait, the refusal the API gives after a real rotation.
 - **Refusals you can try:** spend the balance (`insufficient_balance`), rent France SFR for 30 days (`stock_unavailable`), rotate twice in a row (`rotation_cooldown`), or use a rental id that does not exist (`rental_not_found`).
 
-The sandbox does not show live stock or prices, the time a real device takes to become ready, a read-only key, a daily limit, rate limits, or whether a proxy works for your target. Tool hints differ too: in sandbox mode no tool is marked as spending or as reaching outside the process, because none does.
+The sandbox does not show live stock or prices, the time a real device takes to become ready, a rotation that is still running (`pending`), a read-only key, a daily limit, rate limits, or whether a proxy works for your target. Tool annotations differ too: in sandbox mode none marks a tool as destructive or as reaching outside the process, because no account tool is or does there. With a key, renting, extending and rotating are marked destructive.
 
-`IPVOLT_SANDBOX=1` together with `IPVOLT_API_KEY` stops the server at start, so a simulated rental cannot be mistaken for a real one. To use a real account, remove `IPVOLT_SANDBOX` and set the key as described below.
+`IPVOLT_SANDBOX=1` together with `IPVOLT_API_KEY` stops the server at start, so a simulated rental cannot be mistaken for a real one. It also stops beside `IPVOLT_ENABLE_ROUTE_CHECK=1`, because the route check makes a real request through a real proxy. To use a real account, remove `IPVOLT_SANDBOX` and set the key as described below. Keep the sandbox as its own server entry, as in the example, and add the real one separately: a client may remember approvals you gave to the sandbox's tools under that entry's name.
 
 ### Create a key
 

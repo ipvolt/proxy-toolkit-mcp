@@ -117,10 +117,12 @@ try {
       assert.equal((await call('extend_rental', { rentalId: rental.id, days: 1, confirm: true, requestId: extension.requestId })).order.rentalId, rental.id);
       assert.equal(stderr, '');
     } finally { await client.close(); }
-    // The sandbox and a key never combine: the process stops at start.
-    await assert.rejects(run(process.execPath, [join(clean, 'node_modules', pkg.name, pkg.bin['ipvolt-proxy-toolkit'])], {
-      cwd: clean, timeout: 10_000, env: { IPVOLT_SANDBOX: '1', IPVOLT_API_KEY: 'ipvolt_' + randomBytes(32).toString('base64url') },
-    }), (error) => error.code === 1 && /^Unable to start ipvolt Proxy Toolkit\. IPVOLT_SANDBOX=1 cannot be combined with IPVOLT_API_KEY\./.test(error.stderr));
+    // The sandbox never combines with a key or with the route check: the process stops at start.
+    for (const [extra, name] of [[{ IPVOLT_API_KEY: 'ipvolt_' + randomBytes(32).toString('base64url') }, 'IPVOLT_API_KEY'], [{ IPVOLT_ENABLE_ROUTE_CHECK: '1' }, 'IPVOLT_ENABLE_ROUTE_CHECK=1']]) {
+      await assert.rejects(run(process.execPath, [join(clean, 'node_modules', pkg.name, pkg.bin['ipvolt-proxy-toolkit'])], {
+        cwd: clean, timeout: 10_000, env: { IPVOLT_SANDBOX: '1', ...extra },
+      }), (error) => error.code === 1 && error.stderr.startsWith(`Unable to start ipvolt Proxy Toolkit. IPVOLT_SANDBOX=1 cannot be combined with ${name}.`), name);
+    }
   }
   const sha256 = createHash('sha256').update(await readFile(tarball)).digest('hex');
   const report = { ok: true, name: pkg.name, version: pkg.version, filename: packed.filename, sha256, integrity: packed.integrity, files: packed.files.length, unpackedBytes: packed.unpackedSize, node: process.version, protocols: ['2025-11-25', '2026-07-28'], toolCalls: 8, accountToolsListedWithKey: account.length, sandboxToolCalls };

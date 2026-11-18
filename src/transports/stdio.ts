@@ -16,15 +16,17 @@ class SafeStdioTransport extends StdioServerTransport {
 function main():void {
   if (process.argv.length===3&&process.argv[2]==='--version') {process.stdout.write(VERSION+'\n');return;}
   if (process.argv.length===3&&process.argv[2]==='--help') {
-    process.stdout.write('ipvolt-proxy-toolkit [--help | --version]\n\nDefault: serve four public tools over MCP stdio.\nOptional local route check: IPVOLT_ENABLE_ROUTE_CHECK=1 and privately set IPVOLT_PROXY_URL.\nProxy HTTP CONNECT only; fixed https://mcp.ipvolt.com/egress destination.\nOptional account tools: privately set IPVOLT_API_KEY to an ipvolt API key.\nRenting and extending spend the prepaid balance and need confirmation.\nTry the account tools without an account: IPVOLT_SANDBOX=1 (no key). Simulated, no network, nothing charged.\nNever put credentials in tool arguments.\n');return;
+    process.stdout.write('ipvolt-proxy-toolkit [--help | --version]\n\nDefault: serve four public tools over MCP stdio.\nOptional local route check: IPVOLT_ENABLE_ROUTE_CHECK=1 and privately set IPVOLT_PROXY_URL.\nProxy HTTP CONNECT only; fixed https://mcp.ipvolt.com/egress destination.\nOptional account tools: privately set IPVOLT_API_KEY to an ipvolt API key.\nRenting and extending spend the prepaid balance and need confirmation.\nTry the account tools without an account: IPVOLT_SANDBOX=1 (no key, no route check). Simulated, no network, nothing charged.\nNever put credentials in tool arguments.\n');return;
   }
   if (process.argv.length!==2) throw new Error('Unsupported command-line arguments');
   const flag=process.env.IPVOLT_ENABLE_ROUTE_CHECK;
   if (flag!==undefined&&flag!=='0'&&flag!=='1') throw new Error('Invalid route enable flag');
+  // Sandbox mode is read first: it refuses to start beside a key or the route check, so a server in sandbox mode has
+  // no tool that can reach the network.
+  const sandbox=readSandboxFlag(process.env);
   const checker=flag==='1'?createRouteChecker({enabled:true,proxyUrl:process.env.IPVOLT_PROXY_URL}):undefined;
   // Account tools exist only here: with a key, or in sandbox mode on a simulated account that makes no request.
   // The two never combine. One instance keeps rent/extend previews (and the sandbox account) for the whole session.
-  const sandbox=readSandboxFlag(process.env);
   const config=sandbox?undefined:readAccountConfig(process.env);
   const account=sandbox?createSandboxTools():config?createAccountTools(config):undefined;
   const handle=serveStdio(()=>createToolkitServer({routeChecker:checker,account}),{

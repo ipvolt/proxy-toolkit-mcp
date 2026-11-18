@@ -14,7 +14,8 @@ import {
   SANDBOX_PROXY_HOST, SANDBOX_ROTATION_COOLDOWN_SECONDS, SANDBOX_START_BALANCE_MINOR,
   SandboxApi, SandboxConfigurationError, readSandboxFlag,
 } from '../src/account/sandbox.js';
-import { SANDBOX_NOTICE } from '../src/account/tools.js';
+import { PreviewStore, SANDBOX_NOTICE, registerAccountTools, type AccountTools } from '../src/account/tools.js';
+import type { AccountBackend, ApiResult } from '../src/account/client.js';
 import { createHttpService } from '../src/transports/http.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -72,14 +73,27 @@ test('IPVOLT_SANDBOX: unset, empty and 0 are off, 1 is on, anything else or a ke
     assert.equal(error.message.includes(key), false);
     return true;
   });
+  // The route check is the one other tool that uses the network, so it never starts beside the sandbox.
+  const proxy = `http://user:${sentinel}@127.0.0.1:1`;
+  assert.throws(() => readSandboxFlag({ IPVOLT_SANDBOX: '1', IPVOLT_ENABLE_ROUTE_CHECK: '1', IPVOLT_PROXY_URL: proxy }), (error: unknown) => {
+    assert.ok(error instanceof SandboxConfigurationError);
+    assert.match(error.message, /^IPVOLT_SANDBOX=1 cannot be combined with IPVOLT_ENABLE_ROUTE_CHECK=1\./);
+    assert.equal(error.message.includes(sentinel), false);
+    return true;
+  });
+  assert.equal(readSandboxFlag({ IPVOLT_SANDBOX: '1', IPVOLT_ENABLE_ROUTE_CHECK: '0', IPVOLT_PROXY_URL: proxy }), true);
+  assert.equal(readSandboxFlag({ IPVOLT_SANDBOX: '0', IPVOLT_ENABLE_ROUTE_CHECK: '1', IPVOLT_PROXY_URL: proxy }), false);
 });
 
-test('stdio refuses the sandbox beside a key or with a wrong flag, naming the cause but no value', { timeout: 20_000 }, async () => {
+test('stdio refuses the sandbox beside a key, beside the route check or with a wrong flag, naming the cause but no value', { timeout: 20_000 }, async () => {
   const key = newKey();
   const sentinel = randomBytes(8).toString('hex');
   for (const [env, expected] of [
     [{ IPVOLT_SANDBOX: '1', IPVOLT_API_KEY: key }, /^Unable to start ipvolt Proxy Toolkit\. IPVOLT_SANDBOX=1 cannot be combined with IPVOLT_API_KEY\./],
     [{ IPVOLT_SANDBOX: `yes-${sentinel}` }, /^Unable to start ipvolt Proxy Toolkit\. IPVOLT_SANDBOX must be 0 or 1\.\n$/],
+    // With or without a usable proxy address: the sandbox refusal comes before the route check is built.
+    [{ IPVOLT_SANDBOX: '1', IPVOLT_ENABLE_ROUTE_CHECK: '1', IPVOLT_PROXY_URL: `http://user:${sentinel}@127.0.0.1:1` }, /^Unable to start ipvolt Proxy Toolkit\. IPVOLT_SANDBOX=1 cannot be combined with IPVOLT_ENABLE_ROUTE_CHECK=1\./],
+    [{ IPVOLT_SANDBOX: '1', IPVOLT_ENABLE_ROUTE_CHECK: '1' }, /^Unable to start ipvolt Proxy Toolkit\. IPVOLT_SANDBOX=1 cannot be combined with IPVOLT_ENABLE_ROUTE_CHECK=1\./],
     // Other failures keep the generic sentence, also in sandbox mode.
     [{ IPVOLT_SANDBOX: '1', IPVOLT_ENABLE_ROUTE_CHECK: sentinel }, /^Unable to start ipvolt Proxy Toolkit\. Check the documented local configuration and debug-environment restrictions\.\n$/],
   ] as const) {
@@ -114,8 +128,7 @@ test('stdio lists the seven account tools in sandbox mode, each saying it is sim
       // Nothing leaves the process and nothing real can be lost, and the hints say so.
       assert.equal(tool.annotations?.openWorldHint, false, name);
       assert.equal(tool.annotations?.destructiveHint, false, name);
-      assert.equal(tool.inputSchema.type, 'object');
-      assert.equal((tool.outputSchema?.properties as Record<string, unknown>).sandbox !== undefined, true, name);
+      assert.deepEqual((tool.outputSchema?.properties as Record<string, unknown>).sandbox, { type: 'boolean', const: true }, name);
     }
     for (const name of ['list_stock', 'get_balance', 'list_rentals', 'get_rental']) assert.equal(tools[name]!.annotations?.readOnlyHint, true, name);
     for (const name of ['rent_proxy', 'extend_rental', 'rotate_ip']) assert.equal(tools[name]!.annotations?.readOnlyHint, false, name);
@@ -159,9 +172,12 @@ test('every account tool works in sandbox mode without a key or any network use,
     const rented = okOf(await call('rent_proxy', { confirm: true, requestId: preview.requestId }));
     assert.equal(rented.stage, 'confirmed');
     assert.deepEqual({ status: rented.order.status, replayed: rented.order.replayed, chargedMinor: rented.order.chargedMinor, currency: rented.order.currency }, { status: 'paid', replayed: false, chargedMinor: 13_900, currency: 'USD' });
+    assert.deepEqual(rented.order.rentalIds, [], 'A new order names no rental yet, as with the API');
     const repeated = okOf(await call('rent_proxy', { confirm: true, requestId: preview.requestId }));
     assert.equal(repeated.order.replayed, true);
     assert.equal(repeated.order.orderId, rented.order.orderId);
+    assert.equal(repeated.order.status, 'fulfilled');
+    assert.equal(repeated.order.chargedMinor, 13_900);
     assert.equal(okOf(await call('get_balance')).balance.availableMinor, SANDBOX_START_BALANCE_MINOR - 13_900, 'A repeated confirm charges nothing');
     assert.equal(okOf(await call('get_balance')).key.spentTodayMinor, 13_900);
 
@@ -171,6 +187,7 @@ test('every account tool works in sandbox mode without a key or any network use,
     assert.equal(okOf(listed).rentals.length, 1);
     assert.match(rental.id, /^sandbox-[0-9a-f]{16}$/);
     assert.equal(rental.orderId, rented.order.orderId);
+    assert.deepEqual(repeated.order.rentalIds, [rental.id], 'A repeated confirm names the rental the order made');
     assert.deepEqual({ status: rental.status, country: rental.country, carrier: rental.carrier, online: rental.online, canRotate: rental.canRotate, canExtend: rental.canExtend },
       { status: 'active', country: 'US', carrier: 'Verizon', online: true, canRotate: true, canExtend: true });
     assert.match(rental.externalIp, DOCUMENTATION_ADDRESS);
@@ -227,7 +244,15 @@ test('every account tool works in sandbox mode without a key or any network use,
     assert.equal(all.length, 4);
     assert.equal(new Set(all.map((entry: { connection: { http: { password: string } } }) => entry.connection.http.password)).size, 4, 'Each rental gets its own made-up credentials');
 
-    // Every answer, success or refusal, says it is simulated, in the text and in the structured result.
+    // A call that fails the tool's input schema never reaches the tool: it gets the fixed protocol answer, with nothing simulated in it.
+    for (const [name, args] of [['rent_proxy', { country: 'US', carrier: 'Verizon', days: 7 }], ['get_rental', { rentalId: 'a b' }], ['get_balance', { extra: 1 }]] as const) {
+      const rejected = await mcp.call(name, args);
+      assert.equal(rejected.isError, true);
+      assert.equal(rejected.structuredContent, undefined);
+      assert.equal(text(rejected), 'Invalid tool request. Use tools/list to check the supported tool name, fields and versions.');
+    }
+
+    // Every answer an account tool produces, success or refusal, says it is simulated, in the text and in the structured result.
     assert.ok(seen.length > 25);
     assert.ok(seen.some(result => result.isError === true) && seen.some(result => result.isError !== true));
     for (const result of seen) {
@@ -306,82 +331,118 @@ test('the hosted HTTP service keeps exactly its public tools when IPVOLT_SANDBOX
 test('sandbox API: idempotency, price ceiling, cooldown and rental end follow the API contract', async () => {
   let now = Date.parse('2026-11-18T12:00:00.000Z');
   const api = new SandboxApi({ now: () => now });
-  const data = async (result: ReturnType<SandboxApi['get']>) => { const answer = await result; assert.equal(answer.ok, true, JSON.stringify(answer)); return (answer as { data: Record<string, any> }).data; };
-  const refusal = async (result: ReturnType<SandboxApi['get']>) => { const answer = await result; assert.equal(answer.ok, false, JSON.stringify(answer)); return (answer as { error: Record<string, any> }).error; };
+  const data = async (result: Promise<ApiResult>) => { const answer = await result; assert.equal(answer.ok, true, JSON.stringify(answer)); return (answer as { data: Record<string, any> }).data; };
+  const refusal = async (result: Promise<ApiResult>) => { const answer = await result; assert.equal(answer.ok, false, JSON.stringify(answer)); return (answer as { error: Record<string, any> }).error; };
+  const refused = async (result: Promise<ApiResult>) => { const error = await refusal(result); return `${error.status} ${error.code}`; };
   const order = { country: 'gb', carrier: 'three', days: 1, maxPriceMinor: 1400 };
+  const rent = (body: Record<string, unknown>, idempotencyKey: string = randomUUID()) => api.post('/rentals', { body, idempotencyKey });
 
   // Spending needs a well-formed Idempotency-Key and the documented body.
-  assert.equal((await refusal(api.post('/rentals', { body: order }))).code, 'idempotency_key_required');
-  assert.equal((await refusal(api.post('/rentals', { body: order, idempotencyKey: 'short' }))).code, 'invalid_idempotency_key');
-  assert.equal((await refusal(api.post('/rentals', { body: { ...order, days: 7 }, idempotencyKey: randomUUID() }))).code, 'invalid_order');
-  assert.equal((await refusal(api.post('/rentals', { body: { ...order, quantity: 21 }, idempotencyKey: randomUUID() }))).code, 'invalid_order');
-  assert.equal((await refusal(api.post('/rentals', { body: { country: 'GB', carrier: 'Three', days: 1 }, idempotencyKey: randomUUID() }))).code, 'max_price_required');
-  const ceiling = await refusal(api.post('/rentals', { body: { ...order, maxPriceMinor: 1399 }, idempotencyKey: randomUUID() }));
+  assert.equal(await refused(api.post('/rentals', { body: order })), '400 idempotency_key_required');
+  assert.equal(await refused(rent(order, 'short')), '400 invalid_idempotency_key');
+  for (const wrong of [{ ...order, days: 7 }, { ...order, quantity: 21 }, { ...order, quantity: 0 }, { ...order, country: 'GBR' }, { ...order, carrier: '  ' }, { ...order, note: 'x' },
+    { ...order, maxPriceMinor: 0 }, { ...order, maxPriceMinor: -5 }, { ...order, maxPriceMinor: '1400' }, { ...order, maxPriceMinor: 1_000_001 }, { ...order, maxPriceMinor: 14.5 }]) {
+    assert.equal(await refused(rent(wrong)), '400 invalid_order', JSON.stringify(wrong));
+  }
+  // Only a missing ceiling is max_price_required.
+  assert.equal(await refused(rent({ country: 'GB', carrier: 'Three', days: 1 })), '400 max_price_required');
+  const ceiling = await refusal(rent({ ...order, maxPriceMinor: 1399 }));
   assert.deepEqual({ code: ceiling.code, status: ceiling.status, details: ceiling.details }, { code: 'price_above_max', status: 409, details: { priceMinor: 1400, maxPriceMinor: 1399 } });
-  assert.equal((await refusal(api.post('/rentals', { body: { country: 'FR', carrier: 'SFR', days: 30, maxPriceMinor: 10_000 }, idempotencyKey: randomUUID() }))).code, 'stock_unavailable');
+  assert.equal(await refused(rent({ country: 'FR', carrier: 'SFR', days: 30, maxPriceMinor: 10_000 })), '409 stock_unavailable');
+  assert.equal(await refused(rent({ country: 'JP', carrier: 'Docomo', days: 30, maxPriceMinor: 10_000 })), '409 stock_unavailable');
   assert.equal((await data(api.get('/balance'))).availableMinor, String(SANDBOX_START_BALANCE_MINOR), 'Refused requests charge nothing');
   assert.equal((await data(api.get('/balance'))).mode, 'sandbox');
 
-  // One key, one order: a repeat replays it, another body is a conflict.
+  // One key, one order. A new order is paid and names no rental yet.
   const key = randomUUID();
-  const placed = await data(api.post('/rentals', { body: order, idempotencyKey: key }));
-  assert.deepEqual({ status: placed.status, replayed: placed.replayed, chargedMinor: placed.chargedMinor, rentalIds: placed.rentalIds }, { status: 'paid', replayed: false, chargedMinor: 1400, rentalIds: [] });
-  const replay = await data(api.post('/rentals', { body: order, idempotencyKey: key }));
-  assert.deepEqual(replay, { ...placed, replayed: true });
-  assert.equal((await refusal(api.post('/rentals', { body: { ...order, quantity: 2 }, idempotencyKey: key }))).code, 'intent_conflict');
-  assert.equal((await data(api.get('/balance'))).availableMinor, String(SANDBOX_START_BALANCE_MINOR - 1400));
+  const placed = await data(rent(order, key));
+  assert.deepEqual({ status: placed.status, replayed: placed.replayed, chargedMinor: placed.chargedMinor, currency: placed.currency, rentalIds: placed.rentalIds },
+    { status: 'paid', replayed: false, chargedMinor: 1400, currency: 'USD', rentalIds: [] });
   const [rental] = (await data(api.get('/rentals'))).rentals;
   assert.equal((await data(api.get('/rentals'))).rentals.length, 1);
   assert.equal(rental.endsAt, '2026-11-19T12:00:00.000Z');
+  // A repeat asks for the same thing when country, carrier (any case), length and quantity match: field order, an explicit
+  // default quantity and another price ceiling do not make it a different request. It reads the finished order and its rental.
+  for (const same of [order, { maxPriceMinor: 1400, days: 1, carrier: ' THREE ', country: 'GB' }, { ...order, quantity: 1 }, { ...order, maxPriceMinor: 5 }, { country: 'GB', carrier: 'Three', days: 1 }]) {
+    assert.deepEqual(await data(rent(same, key)), { ...placed, status: 'fulfilled', replayed: true, rentalIds: [rental.id] }, JSON.stringify(same));
+  }
+  // Anything else under a used key is a conflict, before the body is checked.
+  for (const other of [{ ...order, quantity: 2 }, { ...order, days: 30 }, { ...order, country: 'DE' }, { ...order, carrier: 'O2' }, { ...order, days: 7 }, {}]) {
+    assert.equal(await refused(rent(other, key)), '409 intent_conflict', JSON.stringify(other));
+  }
+  assert.equal((await data(api.get('/balance'))).availableMinor, String(SANDBOX_START_BALANCE_MINOR - 1400));
+  assert.equal((await data(api.get('/rentals'))).rentals.length, 1, 'Replays and conflicts rent nothing');
 
   // The key report counts spending per UTC day.
   const keyInfo = await data(api.get('/key'));
-  assert.deepEqual({ access: keyInfo.access, dailyLimitMinor: keyInfo.dailyLimitMinor, spentTodayMinor: keyInfo.spentTodayMinor, dayResetsAt: keyInfo.dayResetsAt },
-    { access: 'read_write', dailyLimitMinor: null, spentTodayMinor: 1400, dayResetsAt: '2026-11-19T00:00:00.000Z' });
+  assert.deepEqual({ access: keyInfo.access, dailyLimitMinor: keyInfo.dailyLimitMinor, spentTodayMinor: keyInfo.spentTodayMinor, remainingTodayMinor: keyInfo.remainingTodayMinor, dayResetsAt: keyInfo.dayResetsAt },
+    { access: 'read_write', dailyLimitMinor: null, spentTodayMinor: 1400, remainingTodayMinor: null, dayResetsAt: '2026-11-19T00:00:00.000Z' });
 
   // Rotation: a new documentation address, then the cooldown counted in whole seconds.
   const path = `/rentals/${encodeURIComponent(rental.id)}`;
   const first = await data(api.post(`${path}/rotate`));
+  assert.deepEqual({ rotated: first.rotated, pending: first.pending }, { rotated: true, pending: false });
   assert.match(first.ip, DOCUMENTATION_ADDRESS);
   assert.notEqual(first.ip, rental.externalIp);
   now += 10_500;
   const wait = await refusal(api.post(`${path}/rotate`));
   assert.deepEqual({ code: wait.code, status: wait.status, details: wait.details }, { code: 'rotation_cooldown', status: 429, details: { retryAfterSeconds: SANDBOX_ROTATION_COOLDOWN_SECONDS - 10 } });
-  now += (SANDBOX_ROTATION_COOLDOWN_SECONDS - 10) * 1000;
-  assert.notEqual((await data(api.post(`${path}/rotate`))).ip, first.ip);
+  now += (SANDBOX_ROTATION_COOLDOWN_SECONDS - 10) * 1000 - 500;
+  assert.notEqual((await data(api.post(`${path}/rotate`))).ip, first.ip, 'The cooldown ends exactly when the seconds it named have passed');
 
   // Extension: quoted, then charged once per key, and the end moves by the days bought.
-  assert.equal((await refusal(api.get(`${path}/extension-price?days=7`))).code, 'invalid_request');
+  const extend = (body: Record<string, unknown>, idempotencyKey: string = randomUUID(), target = path) => api.post(`${target}/extend`, { body, idempotencyKey });
+  assert.equal(await refused(api.get(`${path}/extension-price?days=7`)), '400 invalid_request');
+  assert.equal(await refused(api.get(`${path}/extension-price`)), '400 invalid_request');
   assert.deepEqual(await data(api.get(`${path}/extension-price?days=30`)), { rentalId: rental.id, days: 30, priceMinor: 10_000, currency: 'USD', endsAt: '2026-11-19T12:00:00.000Z' });
-  assert.equal((await refusal(api.post(`${path}/extend`, { body: { days: 30, maxPriceMinor: 10_000 } }))).code, 'idempotency_key_required');
-  assert.equal((await refusal(api.post(`${path}/extend`, { body: { days: 2, maxPriceMinor: 10_000 }, idempotencyKey: randomUUID() }))).code, 'invalid_renewal');
-  assert.equal((await refusal(api.post(`${path}/extend`, { body: { days: 30, maxPriceMinor: 9999 }, idempotencyKey: randomUUID() }))).code, 'price_above_max');
+  assert.equal(await refused(api.post(`${path}/extend`, { body: { days: 30, maxPriceMinor: 10_000 } })), '400 idempotency_key_required');
+  for (const wrong of [{ days: 2, maxPriceMinor: 10_000 }, { days: 30, maxPriceMinor: 0 }, { days: 30, maxPriceMinor: '10000' }, { days: 30, maxPriceMinor: 10_000, quantity: 1 }]) {
+    assert.equal(await refused(extend(wrong)), '400 invalid_renewal', JSON.stringify(wrong));
+  }
+  assert.equal(await refused(extend({ days: 30 })), '400 max_price_required');
+  assert.equal(await refused(extend({ days: 30, maxPriceMinor: 9999 })), '409 price_above_max');
   const extendKey = randomUUID();
-  const extended = await data(api.post(`${path}/extend`, { body: { days: 30, maxPriceMinor: 10_000 }, idempotencyKey: extendKey }));
-  assert.deepEqual({ chargedMinor: extended.chargedMinor, rentalId: extended.rentalId, days: extended.days, replayed: extended.replayed }, { chargedMinor: 10_000, rentalId: rental.id, days: 30, replayed: false });
-  assert.equal((await data(api.post(`${path}/extend`, { body: { days: 30, maxPriceMinor: 10_000 }, idempotencyKey: extendKey }))).replayed, true);
+  const extended = await data(extend({ days: 30, maxPriceMinor: 10_000 }, extendKey));
+  assert.deepEqual({ status: extended.status, chargedMinor: extended.chargedMinor, rentalId: extended.rentalId, days: extended.days, replayed: extended.replayed },
+    { status: 'paid', chargedMinor: 10_000, rentalId: rental.id, days: 30, replayed: false });
+  assert.deepEqual(await data(extend({ days: 30, maxPriceMinor: 20_000 }, extendKey)), { ...extended, status: 'fulfilled', replayed: true });
   assert.equal((await data(api.get(path))).endsAt, '2026-12-19T12:00:00.000Z');
   assert.equal((await data(api.get('/balance'))).availableMinor, String(SANDBOX_START_BALANCE_MINOR - 11_400));
-  // A rent key cannot be reused for an extension.
-  assert.equal((await refusal(api.post(`${path}/extend`, { body: { days: 30, maxPriceMinor: 10_000 }, idempotencyKey: key }))).code, 'intent_conflict');
+  // A key keeps to its operation, its rental and its length.
+  assert.equal(await refused(extend({ days: 30, maxPriceMinor: 10_000 }, key)), '409 intent_conflict');
+  assert.equal(await refused(extend({ days: 1, maxPriceMinor: 10_000 }, extendKey)), '409 intent_conflict');
+  assert.equal(await refused(extend({ days: 30, maxPriceMinor: 10_000 }, extendKey, '/rentals/sandbox-ffffffffffffffff')), '409 intent_conflict');
+  assert.equal(await refused(rent(order, extendKey)), '409 intent_conflict');
+  // The body is checked before the key's order is looked up.
+  assert.equal(await refused(extend({ days: 2, maxPriceMinor: 10_000 }, extendKey)), '400 invalid_renewal');
 
-  // The next UTC day starts a new spending count; an ended rental leaves the list and answers rental_ended.
+  // The next UTC day starts a new spending count.
   now = Date.parse('2026-11-19T00:00:01.000Z');
   assert.equal((await data(api.get('/key'))).spentTodayMinor, 0);
+  assert.equal((await data(rent({ country: 'DE', carrier: 'O2', days: 1, maxPriceMinor: 900 }))).chargedMinor, 900);
+  assert.deepEqual({ spent: (await data(api.get('/key'))).spentTodayMinor, resets: (await data(api.get('/key'))).dayResetsAt }, { spent: 900, resets: '2026-11-20T00:00:00.000Z' });
+
+  // An ended rental leaves the list and answers rental_ended; a repeat of its order is still answered from the order.
   now = Date.parse('2026-12-19T12:00:00.000Z');
   assert.equal((await data(api.get('/rentals'))).rentals.length, 0);
-  for (const attempt of [api.get(path), api.post(`${path}/rotate`), api.get(`${path}/extension-price?days=1`), api.post(`${path}/extend`, { body: { days: 1, maxPriceMinor: 1400 }, idempotencyKey: randomUUID() })]) {
-    const ended = await refusal(attempt);
-    assert.deepEqual({ code: ended.code, status: ended.status }, { code: 'rental_ended', status: 409 });
+  for (const attempt of [api.get(path), api.post(`${path}/rotate`), api.get(`${path}/extension-price?days=1`), extend({ days: 1, maxPriceMinor: 1400 })]) {
+    assert.equal(await refused(attempt), '409 rental_ended');
   }
-  assert.equal((await refusal(api.get('/rentals/sandbox-ffffffffffffffff'))).code, 'rental_not_found');
+  assert.equal((await data(extend({ days: 30, maxPriceMinor: 10_000 }, extendKey))).replayed, true);
+  assert.equal((await data(rent(order, key))).replayed, true);
+  assert.equal(await refused(api.get('/rentals/sandbox-ffffffffffffffff')), '404 rental_not_found');
+  assert.equal(await refused(api.post('/rentals/sandbox-ffffffffffffffff/rotate')), '404 rental_not_found');
+  assert.equal(await refused(extend({ days: 1, maxPriceMinor: 1400 }, randomUUID(), '/rentals/sandbox-ffffffffffffffff')), '404 rental_not_found');
 
-  // Unknown addresses and a cancelled call.
-  for (const attempt of [api.get('/orders'), api.get('/'), api.post('/stock'), api.post('/rentals/x/y/z'), api.get('/rentals/a/b')]) assert.equal((await refusal(attempt)).code, 'not_found');
+  // A known address with the wrong method is 405; an unknown address is 404; a malformed one is 400.
+  for (const attempt of [api.post('/stock'), api.post('/key'), api.post('/balance'), api.post(path), api.post(`${path}/extension-price`), api.get(`${path}/rotate`), api.get(`${path}/extend`)]) {
+    assert.equal(await refused(attempt), '405 method_not_allowed');
+  }
+  for (const attempt of [api.get('/orders'), api.get('/'), api.post('/rentals/x/y/z'), api.get('/rentals/a/b'), api.get('/stock/extra'), api.post('/fund')]) assert.equal(await refused(attempt), '404 not_found');
+  assert.equal(await refused(api.get('/rentals/%E0%A4%A')), '400 invalid_request');
   const cancelled = await refusal(api.post('/rentals', { body: order, idempotencyKey: randomUUID(), signal: AbortSignal.abort() }));
   assert.equal(cancelled.code, 'cancelled');
   assert.equal(cancelled.outcomeUnknown, undefined, 'Nothing ran, so the outcome is known');
-  assert.equal(api.exposes(JSON.stringify(rental)), false);
 });
 
 test('sandbox API: the pretend balance is the only limit and it never goes below zero', async () => {
@@ -397,6 +458,76 @@ test('sandbox API: the pretend balance is the only limit and it never goes below
   assert.equal(!again.ok && again.error.code, 'insufficient_balance');
   const rentals = await api.get('/rentals');
   assert.equal(rentals.ok && (rentals.data.rentals as unknown[]).length, 2);
+});
+
+test('sandbox mode marks the tool wrapper\'s own fallback answers too', async () => {
+  // The tools are registered on a stand-in server so each handler can be called with a backend that misbehaves.
+  const handlers = (api: AccountBackend, sandbox: boolean) => {
+    const registered = new Map<string, (input: Record<string, unknown>, context: unknown) => Promise<Result>>();
+    const tools: AccountTools = { api, previews: new PreviewStore(), ...(sandbox ? { sandbox: true } : {}) };
+    registerAccountTools({ registerTool: (name: string, _definition: unknown, handler: never) => { registered.set(name, handler); } } as never, tools);
+    return (name: string, input: Record<string, unknown> = {}) => registered.get(name)!(input, { mcpReq: { signal: new AbortController().signal } });
+  };
+  const marker = randomBytes(12).toString('hex');
+  const filler = 'x'.repeat(500);
+  const rentals = (password: string): ApiResult => ({ ok: true, status: 200, data: { rentals: Array.from({ length: 100 }, (_, index) => ({
+    id: `r${index}`, status: 'active', connection: { http: { host: 'proxy.sandbox.invalid', port: 10_000, username: filler, password }, socks5: { host: 'proxy.sandbox.invalid', port: 10_001, username: filler, password } },
+  })) } });
+  const cases: [string, AccountBackend][] = [
+    ['internal_error', { get: async () => { throw new Error('broken'); }, post: async () => { throw new Error('broken'); }, exposes: () => false }],
+    ['response_too_large', { get: async () => rentals(filler), post: async () => rentals(filler), exposes: () => false }],
+    ['unsafe_response', { get: async () => rentals(marker), post: async () => rentals(marker), exposes: text => text.includes(marker) }],
+  ];
+  for (const [code, backend] of cases) {
+    const simulated = await handlers(backend, true)('list_rentals');
+    assert.equal(simulated.isError, true, code);
+    assert.equal(simulated.structuredContent!.error.code, code);
+    assert.equal(simulated.structuredContent!.sandbox, true, code);
+    assert.match(simulated.structuredContent!.summary, /^Sandbox \(simulated\): /, code);
+    assert.equal(text(simulated).split('\n')[0], SANDBOX_NOTICE, code);
+    assert.equal(JSON.stringify(simulated).includes(marker), false, code);
+    // The same failure with a key carries no mark.
+    const live = await handlers(backend, false)('list_rentals');
+    assert.equal(live.structuredContent!.error.code, code);
+    assert.equal(/sandbox/i.test(JSON.stringify(live)), false, code);
+  }
+});
+
+test('the network guard refuses every way out of the process, not only fetch', { timeout: 20_000 }, async () => {
+  // Each probe must be refused by the guard itself; one that gets through prints REACHED.
+  const probe = `
+    const attempts = {
+      'fetch': () => fetch('http://127.0.0.1:9/'),
+      'net.connect': async () => (await import('node:net')).connect(9, '127.0.0.1'),
+      'tls.connect': async () => (await import('node:tls')).connect(9, '127.0.0.1'),
+      'http.get': async () => (await import('node:http')).get('http://127.0.0.1:9/'),
+      'https.get': async () => (await import('node:https')).get('https://127.0.0.1:9/'),
+      'dns.lookup': async () => (await import('node:dns')).lookup('sandbox.invalid', () => {}),
+      'dns.resolve4': async () => (await import('node:dns')).resolve4('sandbox.invalid', () => {}),
+      'dns.reverse': async () => (await import('node:dns')).reverse('192.0.2.1', () => {}),
+      'dns.promises.lookup': async () => (await import('node:dns/promises')).lookup('sandbox.invalid'),
+      'dns.promises.resolve': async () => (await import('node:dns/promises')).resolve('sandbox.invalid'),
+      'dns.promises.resolveTxt': async () => (await import('node:dns')).promises.resolveTxt('sandbox.invalid'),
+      'dns.Resolver': async () => new (await import('node:dns')).Resolver().resolve4('sandbox.invalid', () => {}),
+      'dns.promises.Resolver': async () => new (await import('node:dns/promises')).Resolver().resolve('sandbox.invalid'),
+      'dgram.send': async () => (await import('node:dgram')).createSocket('udp4').send('x', 9, '127.0.0.1'),
+      'dgram.bind': async () => (await import('node:dgram')).createSocket('udp4').bind(0),
+      'child_process.spawn': async () => (await import('node:child_process')).spawn(process.execPath, ['--version']),
+      'child_process.execFileSync': async () => (await import('node:child_process')).execFileSync(process.execPath, ['--version']),
+      'child_process.fork': async () => (await import('node:child_process')).fork('nothing.mjs'),
+      'worker_threads.Worker': async () => new (await import('node:worker_threads')).Worker('1', { eval: true }),
+      'WebSocket': () => new WebSocket('ws://127.0.0.1:9/'),
+    };
+    for (const [name, attempt] of Object.entries(attempts)) {
+      try { await attempt(); console.log('REACHED ' + name); }
+      catch (error) { console.log((error.message === 'Network use is not allowed in this test' ? 'REFUSED ' : 'OTHER ') + name); }
+    }
+    process.exit(0);`;
+  const { stdout, stderr } = await run(process.execPath, ['--import', guard, '--input-type=module', '-e', probe], { cwd: root, env: { PATH: process.env.PATH ?? '' }, timeout: 15_000 });
+  const lines = stdout.trim().split('\n');
+  assert.equal(lines.length, 20);
+  assert.deepEqual(lines.filter(line => !line.startsWith('REFUSED ')), [], stdout);
+  assert.equal(stderr.trim().split('\n').filter(line => line.startsWith('NETWORK ATTEMPT: ')).length, 20, stderr);
 });
 
 test('sandbox source: sample data holds no key-shaped value and only reserved names and addresses', () => {
