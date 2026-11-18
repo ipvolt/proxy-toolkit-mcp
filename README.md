@@ -142,7 +142,7 @@ Any other client that accepts `mcpServers` takes the same `env` entry, also with
 
 ### How spending works
 
-- `rent_proxy` and `extend_rental` work in two steps. Called without `confirm: true`, they only look up the current price and answer with the exact charge and a `requestId`, for example: "Renting 1 × US Verizon for 30 days will charge $100.00 from your balance. To proceed, call rent_proxy again with confirm: true and requestId: …". Nothing is charged. Approve that charge before the assistant confirms it.
+- `rent_proxy` and `extend_rental` work in two steps. Called without `confirm: true`, they only look up the current price and answer with the exact charge and a `requestId`, for example: "Renting 1 × US Verizon for 30 days will charge $100.00 from your balance. Nothing has been charged yet. To proceed, call rent_proxy again with confirm: true and requestId: …". Nothing is charged. Approve that charge before the assistant confirms it.
 - Called with `confirm: true` and that `requestId`, the tool sends the request with the `requestId` as its `Idempotency-Key` and the previewed price as the maximum per device. Repeating a confirm returns the same order and never charges twice. If the price rose in between, the API refuses the request instead of charging more.
 - If a confirm times out or the connection drops, its outcome is unknown. Repeat it with the same `requestId` to see the order; it cannot charge twice.
 - All charges come from the prepaid balance. The tools cannot add funds, withdraw or change the account. Add funds in the dashboard.

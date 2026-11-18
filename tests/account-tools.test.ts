@@ -12,6 +12,7 @@ import { promisify } from 'node:util';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { AccountApi, AccountConfigurationError, DEFAULT_API_BASE, USER_AGENT, readAccountConfig } from '../src/account/client.js';
+import { PreviewStore } from '../src/account/tools.js';
 import { createHttpService } from '../src/transports/http.js';
 import { VERSION } from '../src/meta.js';
 
@@ -615,4 +616,23 @@ test('API client: GET retries once after a network error; timeouts, POST and red
     const unavailable = await api.post('/rentals', { idempotencyKey: randomUUID(), body: {} });
     assert.equal(!unavailable.ok && unavailable.error.outcomeUnknown, undefined);
   } finally { await fake.close(); }
+});
+
+test('previews expire unless confirmed; confirmed requestIds are kept and evicted last', () => {
+  let now = 0;
+  const store = new PreviewStore(1000, 3, () => now);
+  const draft = { kind: 'extend' as const, rentalId: RENTAL, days: 30 as const, priceMinor: 10000, currency: 'USD' };
+  const confirmed = store.add(draft);
+  const pending = store.add(draft);
+  const entry = store.get(confirmed);
+  assert.ok(entry && entry !== 'expired');
+  entry.sent = true;
+  now = 1001;
+  assert.equal(store.get(pending), 'expired');
+  assert.equal(store.get(pending), undefined);
+  assert.equal(store.get(confirmed), entry, 'A sent confirm keeps its requestId after the preview lifetime');
+  const second = store.add(draft), third = store.add(draft);
+  store.add(draft);
+  assert.equal(store.get(confirmed), entry, 'Unconfirmed previews are evicted before confirmed ones');
+  assert.equal([second, third].filter(id => store.get(id) === undefined).length, 1);
 });
