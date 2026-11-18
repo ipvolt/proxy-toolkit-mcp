@@ -1,0 +1,104 @@
+name: Publish the reviewed root server.json as a new MCP Registry version
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_commit:
+        description: Full reviewed metadata commit tagged registry-vVERSION (the version in server.json)
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: official-mcp-registry-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'ipvolt/proxy-toolkit-mcp'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      REVIEWED_COMMIT: ${{ inputs.reviewed_commit }}
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Check out the exact manually selected metadata revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch the source tag of this npm version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(python3 -c 'import json; print(json.load(open("server.json"))["version"])')"
+          [[ "$version" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$ ]]
+          # The guard requires the metadata to descend from the source this npm version was built from,
+          # and to be merged into main.
+          git fetch --no-tags --force origin "refs/tags/v${version}:refs/tags/v${version}" \
+            "+refs/heads/main:refs/remotes/origin/main"
+      - name: Verify the tagged metadata, the public npm version and the unused Registry version
+        run: python3 registry/release/check.py preflight
+      - name: Set up the reviewed Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.20.0
+          package-manager-cache: false
+      - name: Install the frozen verification dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test publication guards
+        run: |
+          # The 0.1.0 and 0.1.1 suites are frozen to their own source state and are not run here.
+          python3 -m unittest discover -s registry/release -p 'test_*.py' -v
+          node --import tsx --test registry/hosted/check-remote.test.mjs
+      - name: Download and verify the official publisher
+        shell: bash
+        run: |
+          set -euo pipefail
+          publisher_dir="$RUNNER_TEMP/ipvolt-mcp-publisher"
+          mkdir -m 700 "$publisher_dir"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --connect-timeout 15 --max-time 120 --max-filesize 20971520 \
+            --output "$publisher_dir/publisher.tar.gz" \
+            'https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz'
+          printf '%s  %s\n' \
+            'a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc' \
+            "$publisher_dir/publisher.tar.gz" | sha256sum --check --status
+          tar --extract --gzip --file "$publisher_dir/publisher.tar.gz" \
+            --directory "$publisher_dir" --no-same-owner --no-same-permissions mcp-publisher
+          "$publisher_dir/mcp-publisher" --version
+      - name: Validate, authenticate with GitHub OIDC, and publish once
+        id: publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          publisher="$RUNNER_TEMP/ipvolt-mcp-publisher/mcp-publisher"
+          # Publisher 1.8.1 stores tokens here, outside the repository. Refuse old state.
+          test ! -e "$HOME/.config/mcp-publisher"
+          mkdir -p "$HOME/.config"
+          mkdir -m 700 "$HOME/.config/mcp-publisher"
+          trap 'rm -f -- "$HOME/.config/mcp-publisher/token.json"; rmdir -- "$HOME/.config/mcp-publisher"' EXIT
+          timeout --kill-after=5s 90s "$publisher" validate server.json
+          # Upstream auth errors can contain response bodies; keep them out of job logs.
+          if ! timeout --kill-after=5s 90s "$publisher" login github-oidc \
+            --registry https://registry.modelcontextprotocol.io > /dev/null 2>&1; then
+            printf '%s\n' 'GitHub OIDC authentication failed.' >&2
+            exit 1
+          fi
+          printf '%s\n' 'GitHub OIDC authentication succeeded.'
+          # Recheck npm, unused version, and both public protocols immediately before publish.
+          # The child verifier receives no token or proxy environment.
+          python3 registry/release/check.py prepublish
+          # No publish retry: an uncertain result must be resolved by public read-back.
+          printf 'attempted=true\n' >> "$GITHUB_OUTPUT"
+          if ! timeout --kill-after=5s 120s "$publisher" publish server.json > /dev/null 2>&1; then
+            printf '%s\n' 'Registry publication did not report success. Inspect the exact-version read-back before any retry.' >&2
+            exit 1
+          fi
+          printf '%s\n' 'Registry publication reported success.'
+      - name: Read back the exact active Registry version
+        if: always() && steps.publication.outputs.attempted == 'true'
+        run: python3 registry/release/check.py read-back

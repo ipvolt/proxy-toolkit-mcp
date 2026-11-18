@@ -27,3 +27,4 @@ jobs:
       - run: npm run check:manifest
       - run: npm run check:package
       - run: IPVOLT_DEPLOY_NODE="$(command -v node)" python3 -m unittest discover -s deploy -p 'test_*.py' -v
+      - run: python3 -m unittest discover -s registry/release -p 'test_*.py' -v
