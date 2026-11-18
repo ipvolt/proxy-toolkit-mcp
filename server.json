@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ipvolt/proxy-toolkit",
   "title": "ipvolt Proxy Toolkit",
-  "description": "Rent and manage ipvolt mobile proxies locally with an API key; proxy setup guides and diagnostics.",
-  "version": "0.2.0",
+  "description": "Rent and manage ipvolt mobile proxies locally with an API key, or try a no-key sandbox; proxy docs.",
+  "version": "0.3.0",
   "websiteUrl": "https://ipvolt.com",
   "repository": {
     "url": "https://github.com/ipvolt/proxy-toolkit-mcp",
@@ -14,7 +14,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@ipvolt/proxy-toolkit-mcp",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "runtimeHint": "npx",
       "transport": { "type": "stdio" },
       "environmentVariables": [
@@ -40,6 +40,15 @@
           "format": "string",
           "isRequired": false,
           "isSecret": true
+        },
+        {
+          "name": "IPVOLT_SANDBOX",
+          "description": "Optional sandbox. Set 1, without IPVOLT_API_KEY or the route diagnostic, to try the seven account tools on a simulated account: sample stock, a pretend balance and rentals that connect to nothing. It sends no request and charges nothing.",
+          "choices": ["0", "1"],
+          "default": "0",
+          "format": "string",
+          "isRequired": false,
+          "isSecret": false
         }
       ]
     }

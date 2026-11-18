@@ -1,7 +1,7 @@
 {
   "name": "@ipvolt/proxy-toolkit-mcp",
-  "version": "0.2.0",
-  "description": "Reviewed proxy documentation, tested configuration templates, bounded local route diagnostics and optional ipvolt account tools for MCP clients.",
+  "version": "0.3.0",
+  "description": "Reviewed proxy documentation, tested configuration templates, bounded local route diagnostics and optional ipvolt account tools, with a no-key sandbox, for MCP clients.",
   "type": "module",
   "license": "MIT",
   "mcpName": "io.github.ipvolt/proxy-toolkit",

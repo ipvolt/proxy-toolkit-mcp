@@ -2,11 +2,11 @@
 
 An MCP server for finding reviewed proxy documentation, generating tested configuration examples and diagnosing structured proxy failures. The public tools run locally against a bundled catalog. They do not need an API key or access to an ipvolt proxy account.
 
-Without an API key, the toolkit does not provision proxies, spend money or access account data. With one, the optional [account tools](#account-tools-optional) let a local install rent and manage ipvolt mobile proxies paid from your prepaid balance. The toolkit never configures another agent's network route.
+Without an API key, the toolkit does not provision proxies, spend money or access account data. With one, the optional [account tools](#account-tools-optional) let a local install rent and manage ipvolt mobile proxies paid from your prepaid balance. To try those tools before you have an account, start the server in [sandbox mode](#try-them-without-an-account-sandbox): the same tools on a simulated account, with no key and nothing charged. The toolkit never configures another agent's network route.
 
 ## Availability
 
-The npm package and the public hosted service provide four tools using a bundled public catalog. Version 0.2.0 adds seven optional account tools to local (stdio) installs that set an API key; the hosted service never offers them. Check [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md) for verified npm availability, the hosted endpoint and registry listings. Source builds work independently of those distribution channels. Registry metadata in `server.json` describes the intended release and is not evidence that a channel is live.
+The npm package and the public hosted service provide four tools using a bundled public catalog. Version 0.2.0 adds seven optional account tools to local (stdio) installs that set an API key, and version 0.3.0 adds a sandbox mode that runs them on a simulated account without a key; the hosted service never offers either. Check [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md) for verified npm availability, the hosted endpoint and registry listings. Source builds work independently of those distribution channels. Registry metadata in `server.json` describes the intended release and is not evidence that a channel is live.
 
 ## Tools
 
@@ -17,8 +17,8 @@ The npm package and the public hosted service provide four tools using a bundled
 | `generate_proxy_config` | Return an exact-version HTTPS GET template with local environment placeholders. It does not execute code. | Hosted and local |
 | `diagnose_proxy_error` | Interpret structured observations such as CONNECT407, TLS failure or an ambiguous timeout; state uncertainty and retry boundaries. | Hosted and local |
 | `check_proxy_route` | Make one bounded request through an explicitly configured local proxy to the fixed ipvolt echo endpoint. | Local, explicitly enabled |
-| `list_stock`, `get_balance`, `list_rentals`, `get_rental` | Read stock and prices, your balance and key limits, and your rentals with their connection details. | Local, with `IPVOLT_API_KEY` |
-| `rent_proxy`, `extend_rental`, `rotate_ip` | Rent or extend mobile proxies from your prepaid balance (after a confirmation step), or rotate a rental's IP. | Local, with a read-write `IPVOLT_API_KEY` |
+| `list_stock`, `get_balance`, `list_rentals`, `get_rental` | Read stock and prices, your balance and key limits, and your rentals with their connection details. | Local, with `IPVOLT_API_KEY`; simulated with `IPVOLT_SANDBOX=1` |
+| `rent_proxy`, `extend_rental`, `rotate_ip` | Rent or extend mobile proxies from your prepaid balance (after a confirmation step), or rotate a rental's IP. | Local, with a read-write `IPVOLT_API_KEY`; simulated with `IPVOLT_SANDBOX=1` |
 
 For example, search with `{"query":"curl proxy","topic":"setup"}`, then retrieve `{"documentId":"/guides/curl-proxy-setup"}`. Generate a synchronous HTTPX example with `{"client":"httpx","version":"0.28.1"}`. Diagnose a proxy authentication failure with `{"client":"httpx","version":"0.28.1","phase":"proxy_connect","status":407}`. A 407 observation points to proxy authentication; it does not establish whether a password, account state or access policy is responsible.
 
@@ -48,7 +48,7 @@ For a client that accepts a `mcpServers` configuration, use an absolute path to 
 }
 ```
 
-Without `IPVOLT_API_KEY`, the local server exposes four tools, sends no telemetry and makes no network requests. A client may send tool results to its own model provider. The server cannot control that client's data handling.
+Without `IPVOLT_API_KEY`, the local server exposes four tools, sends no telemetry and makes no network requests. With `IPVOLT_SANDBOX=1` it exposes eleven and still makes none. A client may send tool results to its own model provider. The server cannot control that client's data handling.
 
 For the npm distribution, use the pinned package version after confirming its availability in release status:
 
@@ -57,7 +57,7 @@ For the npm distribution, use the pinned package version after confirming its av
   "mcpServers": {
     "ipvolt": {
       "command": "npx",
-      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.2.0"]
+      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.3.0"]
     }
   }
 }
@@ -90,7 +90,7 @@ The diagnostic requires the hosted echo service to be available. Check release s
 
 ## Account tools (optional)
 
-With an ipvolt API key, a local stdio install adds seven tools that call the ipvolt customer API at `https://ipvolt.com/beta/api/v1`. Without the key they are not registered. The hosted service at `mcp.ipvolt.com` never offers them.
+With an ipvolt API key, a local stdio install adds seven tools that call the ipvolt customer API at `https://ipvolt.com/beta/api/v1`. Without the key they are not registered, unless you start the [sandbox](#try-them-without-an-account-sandbox). The hosted service at `mcp.ipvolt.com` never offers them.
 
 | Tool | What it does | Cost |
 | --- | --- | --- |
@@ -101,6 +101,43 @@ With an ipvolt API key, a local stdio install adds seven tools that call the ipv
 | `rent_proxy` | Rent 1 to 20 devices for 1 or 30 days. | Charges the prepaid balance, after confirmation |
 | `extend_rental` | Extend an active rental by 1 or 30 days. | Charges the prepaid balance, after confirmation |
 | `rotate_ip` | Ask for a new IP address on a rental. Open connections through the device may drop. | Free; changes the device's IP |
+
+### Try them without an account (sandbox)
+
+Set `IPVOLT_SANDBOX=1` and no API key. The server then offers the same seven tools on a simulated account that exists only inside the server process. You need no ipvolt account, key or balance.
+
+```json
+{
+  "mcpServers": {
+    "ipvolt-sandbox": {
+      "command": "npx",
+      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.3.0"],
+      "env": { "IPVOLT_SANDBOX": "1" }
+    }
+  }
+}
+```
+
+With Claude Code:
+
+```sh
+claude mcp add ipvolt-sandbox -e IPVOLT_SANDBOX=1 -- npx --yes @ipvolt/proxy-toolkit-mcp@0.3.0
+```
+
+Then ask the assistant to list the stock, rent a proxy, show its connection details, rotate its IP and extend it.
+
+- **Nothing is real.** A server in sandbox mode sends no network request, reads no key and stores nothing. No proxy is rented and nothing is charged. Restarting the server resets the account.
+- **Every answer from an account tool says so.** A successful answer starts with a `SANDBOX:` line. Every structured result, success or refusal, has `sandbox: true` and a summary that starts `Sandbox (simulated):`. Tool titles end in "(sandbox)", and each description starts with `SANDBOX MODE` before it says what the tool does with a real key. A call with arguments the tool does not accept never reaches the tool: it gets the short protocol error, which has nothing simulated in it.
+- **The account.** It starts with a pretend balance of $500.00 and no rentals. Its key is read-write and has no daily limit.
+- **Stock and prices are samples.** `list_stock` returns eleven sample offers in stock, and a twelfth that is sold out when you pass `includeSoldOut: true`. They are a subset of the public list on 18 November 2026 and are not live. Current prices are at [ipvolt.com/pricing](https://ipvolt.com/pricing).
+- **Renting and extending** take the same two steps as with a key: a preview with the charge and a `requestId`, then `confirm: true`. Repeating a confirm returns the same order, now `fulfilled`, and charges the pretend balance once; a repeated rental order then also names its rental ids. A new rental is in `list_rentals` at once; a real device takes minutes to set up.
+- **Simulated rentals connect to nothing.** Their ids start with `sandbox-`. The host is `proxy.sandbox.invalid`, which cannot resolve. The usernames and passwords are made up when the rental is created, and the IP addresses come from the blocks reserved for documentation.
+- **Rotating** gives the rental a new simulated address. A second rotation within 30 seconds is refused with `rotation_cooldown` and the seconds to wait, the refusal the API gives after a real rotation.
+- **Refusals you can try:** spend the balance (`insufficient_balance`), rent France SFR for 30 days (`stock_unavailable`), rotate twice in a row (`rotation_cooldown`), or use a rental id that does not exist (`rental_not_found`).
+
+The sandbox does not show live stock or prices, the time a real device takes to become ready, a rotation that is still running (`pending`), a read-only key, a daily limit, rate limits, or whether a proxy works for your target. Tool annotations differ too: in sandbox mode none marks a tool as destructive or as reaching outside the process, because no account tool is or does there. With a key, renting, extending and rotating are marked destructive.
+
+`IPVOLT_SANDBOX=1` together with `IPVOLT_API_KEY` stops the server at start, so a simulated rental cannot be mistaken for a real one. It also stops beside `IPVOLT_ENABLE_ROUTE_CHECK=1`, because the route check makes a real request through a real proxy. To use a real account, remove `IPVOLT_SANDBOX` and set the key as described below. Keep the sandbox as its own server entry, as in the example, and add the real one separately: a client may remember approvals you gave to the sandbox's tools under that entry's name.
 
 ### Create a key
 
@@ -114,7 +151,7 @@ Use a read-only key unless the assistant needs to rent, rotate or extend, and gi
 
 ### Configure it
 
-Put the key only in your MCP client's local environment, never in a tool argument, a prompt or a file you share. The examples pin version 0.2.0; confirm it in [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md) first.
+Put the key only in your MCP client's local environment, never in a tool argument, a prompt or a file you share. The examples pin version 0.3.0; confirm it in [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md) first.
 
 Claude Desktop, in `claude_desktop_config.json`:
 
@@ -123,7 +160,7 @@ Claude Desktop, in `claude_desktop_config.json`:
   "mcpServers": {
     "ipvolt": {
       "command": "npx",
-      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.2.0"],
+      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.3.0"],
       "env": { "IPVOLT_API_KEY": "ipvolt_your_key" }
     }
   }
@@ -133,7 +170,7 @@ Claude Desktop, in `claude_desktop_config.json`:
 Claude Code, reading the key from your shell so it stays out of the command history:
 
 ```sh
-claude mcp add ipvolt -e IPVOLT_API_KEY="$IPVOLT_API_KEY" -- npx --yes @ipvolt/proxy-toolkit-mcp@0.2.0
+claude mcp add ipvolt -e IPVOLT_API_KEY="$IPVOLT_API_KEY" -- npx --yes @ipvolt/proxy-toolkit-mcp@0.3.0
 ```
 
 This uses Claude Code's default local scope. Do not add it with `--scope project`, which writes the key into the repository's `.mcp.json`.
@@ -145,7 +182,7 @@ Any other client that accepts `mcpServers` takes the same `env` entry, also with
 - `rent_proxy` and `extend_rental` work in two steps. Called without `confirm: true`, they only look up the current price and answer with the exact charge and a `requestId`, for example: "Renting 1 × US Verizon for 30 days will charge $100.00 from your balance. Nothing has been charged yet. To proceed, call rent_proxy again with confirm: true and requestId: …". Nothing is charged. Approve that charge before the assistant confirms it.
 - Called with `confirm: true` and that `requestId`, the tool sends the request with the `requestId` as its `Idempotency-Key` and the previewed price as the maximum per device. Repeating a confirm returns the same order and never charges twice. If the price rose in between, the API refuses the request instead of charging more.
 - If a confirm times out or the connection drops, its outcome is unknown. Repeat it with the same `requestId` to see the order; it cannot charge twice.
-- All charges come from the prepaid balance. The tools cannot add funds, withdraw or change the account. Add funds in the dashboard.
+- All charges come from the prepaid balance. The tools cannot add funds, withdraw or change the account. Add funds in the dashboard, or let the agent pay its own USDC on Base through the top-up described at https://ipvolt.com/docs/api.
 - A preview is kept by the running server for 15 minutes. After a restart, preview again.
 - A new rental is charged when the order is accepted, and the device is usually ready within minutes: `list_rentals` then shows it. If setup fails, the money returns to the balance.
 - Refusals arrive with the API's error code and message, for example `insufficient_balance` with the missing amount, `daily_limit_exceeded` with what remains today, or `rotation_cooldown` with the seconds to wait.
@@ -185,7 +222,7 @@ npm run check:package
 python3 -m unittest discover -s deploy -p 'test_*.py' -v
 ```
 
-`check:package` inspects the actual npm tarball, installs it in a temporary consumer directory and discovers/calls all four tools with the current and legacy protocol paths. It also checks that an API key adds the seven account tools; the account tests in `tests/account-tools.test.ts` run them against a local stand-in for the API. `check:content -- --live` compares every bundled Markdown document to its public canonical export; it performs only those allowlisted public reads.
+`check:package` inspects the actual npm tarball, installs it in a temporary consumer directory and discovers/calls all four tools with the current and legacy protocol paths. It also checks that an API key adds the seven account tools, and calls all seven in sandbox mode; the account tests in `tests/account-tools.test.ts` run them against a local stand-in for the API, and `tests/sandbox.test.ts` runs the sandbox in a process where any network use is refused. `check:content -- --live` compares every bundled Markdown document to its public canonical export; it performs only those allowlisted public reads.
 
 The runtime does not crawl the website. A maintainer exports only the reviewed public guide/blog catalogs from a verified website source using `scripts/export-content.ts`, reviews the resulting diff and publishes a new immutable package version. Drafts and private operational applications are outside that allowlist. Bundle and document SHA-256 values make source changes observable.
 

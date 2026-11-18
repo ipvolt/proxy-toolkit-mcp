@@ -8,7 +8,7 @@ import { SERVER_NAME, VERSION } from './meta.js';
 import { PUBLIC_ERRORS } from './protocol-safety.js';
 
 export type ToolMetric = {tool:string; status:'ok'|'error'; durationMs:number; version:string};
-/** `account` is supplied only by the local stdio entry when IPVOLT_API_KEY is set; the hosted HTTP service never passes it. */
+/** `account` is supplied only by the local stdio entry, with IPVOLT_API_KEY or in sandbox mode (IPVOLT_SANDBOX=1); the hosted HTTP service never passes it. */
 export type ToolkitOptions = {catalog?:PublicCatalog; routeChecker?:RouteChecker; account?:AccountTools; onToolComplete?:(metric:ToolMetric)=>void};
 const readOnly = {readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false};
 

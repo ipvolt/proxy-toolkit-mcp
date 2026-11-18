@@ -69,6 +69,14 @@ export interface RequestOptions {
 }
 export interface AccountApiOptions { getTimeoutMs?: number; postTimeoutMs?: number; retryDelayMs?: number; fetch?: typeof fetch }
 
+/** What the account tools need behind them: the API client below, or the in-process sandbox. */
+export interface AccountBackend {
+  get(path: string, options?: RequestOptions): Promise<ApiResult>;
+  post(path: string, options?: RequestOptions): Promise<ApiResult>;
+  /** True when text contains a credential this backend holds. */
+  exposes(text: string): boolean;
+}
+
 function clean(text: string, limit = 300): string {
   const value = text.replace(/[\u0000-\u001f\u007f]+/gu, ' ').trim();
   return value.length > limit ? value.slice(0, limit - 1) + '…' : value;
@@ -82,7 +90,7 @@ function record(value: unknown): value is Record<string, unknown> {
  * responses (which can contain proxy credentials) stay in memory and in the
  * tool result that asked for them.
  */
-export class AccountApi {
+export class AccountApi implements AccountBackend {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly getTimeoutMs: number;

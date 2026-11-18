@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { VERSION } from '../meta.js';
-import { AccountApi, type AccountApiOptions, type AccountConfig, type ApiFailure, type ApiResult } from './client.js';
+import { AccountApi, type AccountApiOptions, type AccountBackend, type AccountConfig, type ApiFailure, type ApiResult } from './client.js';
+import { SANDBOX_START_BALANCE_MINOR, SandboxApi, type SandboxOptions } from './sandbox.js';
 
 /* ------------------------------------------------------------------ inputs */
 
@@ -43,7 +44,8 @@ const errorOutput = z.strictObject({
   dailyLimitMinor: z.number().int().optional(), spentTodayMinor: z.number().int().optional(), remainingTodayMinor: z.number().int().optional(),
   remainingMinor: z.number().int().optional(), retryAfterSeconds: z.number().int().optional(), resetsAt: z.string().optional(),
 });
-const base = { ok: z.boolean(), summary: z.string(), error: errorOutput.optional() };
+/** `sandbox: true` marks an answer from the simulated account of sandbox mode; it is absent on answers about a real account. */
+const base = { ok: z.boolean(), summary: z.string(), error: errorOutput.optional(), sandbox: z.literal(true).optional() };
 const offerOutput = z.strictObject({
   country: z.string(), countryName: z.string().optional(), carrier: z.string(), days: z.number().int(),
   priceMinor: z.number().int().nullable(), available: z.boolean(), includedGb: z.number().optional(),
@@ -98,7 +100,9 @@ const apiOffer = z.object({
   country: text(8), countryName: text(120).optional(), carrier: text(120), days: z.number().int(),
   priceMinor: minor.nullable(), available: z.boolean(), includedGb: z.number().nonnegative().optional(),
 });
-const apiStock = z.object({ currency: text(8).optional(), observedAt: text(40).optional(), purchasesOpen: z.boolean().optional(), offers: z.array(apiOffer).max(10_000) });
+// The API answers null, not an absent field, where it has no value: observedAt while the stock feed is unread, and a rental's
+// order, country, carrier or end time when the device has none. The mappers below leave such fields out.
+const apiStock = z.object({ currency: text(8).optional(), observedAt: text(40).nullish(), purchasesOpen: z.boolean().optional(), offers: z.array(apiOffer).max(10_000) });
 const apiKey = z.object({
   name: text(128).optional(), access: text(32), dailyLimitMinor: minor.nullable().optional(), spentTodayMinor: minor.optional(),
   remainingTodayMinor: z.number().int().nullable().optional(), dayResetsAt: text(40).optional(), expiresAt: text(40).optional(),
@@ -107,8 +111,8 @@ const cents = z.union([z.string().regex(/^-?\d{1,15}$/).transform(Number), z.num
 const apiBalance = z.object({ currency: text(8).optional(), availableMinor: cents, heldMinor: cents.optional() });
 const apiEndpoint = z.object({ host: text(255), port: z.number().int().min(1).max(65_535), username: text(512), password: text(512) });
 const apiRental = z.object({
-  id: text(128), orderId: text(128).optional(), status: text(40),
-  country: text(8).optional(), countryName: text(120).optional(), carrier: text(120).optional(), endsAt: text(40).optional(),
+  id: text(128), orderId: text(128).nullish(), status: text(40),
+  country: text(8).nullish(), countryName: text(120).nullish(), carrier: text(120).nullish(), endsAt: text(40).nullish(),
   online: z.boolean().optional(), externalIp: text(64).nullable().optional(), canRotate: z.boolean().optional(), canExtend: z.boolean().optional(),
   includedGb: z.number().nonnegative().optional(),
   connection: z.object({ http: apiEndpoint.optional(), socks5: apiEndpoint.optional() }).optional(),
@@ -118,7 +122,7 @@ const apiOrder = z.object({
   orderId: text(128), status: text(40), replayed: z.boolean().optional(), chargedMinor: minor, currency: text(8).optional(),
   rentalIds: z.array(text(128)).max(100).optional(), rentalId: text(128).optional(), days: z.number().int().optional(),
 });
-const apiPrice = z.object({ days: z.number().int().optional(), priceMinor: minor, currency: text(8).optional(), endsAt: text(40).optional() });
+const apiPrice = z.object({ days: z.number().int().optional(), priceMinor: minor, currency: text(8).optional(), endsAt: text(40).nullish() });
 const apiRotation = z.object({ rotated: z.boolean().optional(), pending: z.boolean().optional(), ip: text(64).nullable().optional(), message: text(1000).optional() });
 
 /* ---------------------------------------------------------------- helpers */
@@ -156,10 +160,10 @@ const HINTS: Record<string, string> = {
   try_again_later: 'A rate limit was reached. Wait a few minutes before trying again.',
 };
 
-function failure(error: ApiFailure, retry?: string): Outcome {
+function describeFailure(error: ApiFailure, retry: string | undefined, sandbox: boolean): Outcome {
   const parts = [`${error.message.replace(/[.\s]+$/u, '')} (${error.code}).`];
   const d = error.details;
-  if (error.code === 'insufficient_balance' && d.missingMinor !== undefined) parts.push(`Your balance is ${money(d.missingMinor)} short${d.requiredMinor !== undefined ? ` of the ${money(d.requiredMinor)} required` : ''}. Add funds in the dashboard first.`);
+  if (error.code === 'insufficient_balance' && d.missingMinor !== undefined) parts.push(`Your balance is ${money(d.missingMinor)} short${d.requiredMinor !== undefined ? ` of the ${money(d.requiredMinor)} required` : ''}. ${sandbox ? 'The sandbox balance cannot be topped up; restart the server to reset it.' : 'Add funds in the dashboard, or pay your own USDC on Base through the top-up at https://ipvolt.com/api/v1 (see https://ipvolt.com/docs/api), then try again.'}`);
   if (error.code === 'price_above_max' && d.priceMinor !== undefined) parts.push(`The price is now ${money(d.priceMinor)}${d.maxPriceMinor !== undefined ? `, above the previewed ${money(d.maxPriceMinor)}` : ''}.`);
   if (error.code === 'daily_limit_exceeded' && d.remainingTodayMinor !== undefined) parts.push(`This key can spend ${money(d.remainingTodayMinor)} more today${d.resetsAt ? `; the limit resets at ${d.resetsAt}` : ''}.`);
   if (error.code === 'spend_cap_exceeded' && d.remainingMinor !== undefined) parts.push(`This credential can spend ${money(d.remainingMinor)} more.`);
@@ -170,12 +174,6 @@ function failure(error: ApiFailure, retry?: string): Outcome {
   const summary = parts.join(' ');
   const { details, ...rest } = error;
   return { output: { ok: false, summary, error: { ...rest, ...details } }, text: summary };
-}
-function localFailure(code: string, message: string): Outcome {
-  return failure({ code, message, details: {} });
-}
-function unexpected(status?: number): Outcome {
-  return failure({ code: 'unexpected_response', message: 'The ipvolt API answered in an unexpected format', ...(status ? { status } : {}), details: {} });
 }
 
 function offer(value: z.infer<typeof apiOffer>): Offer {
@@ -219,6 +217,24 @@ function describeRental(value: Rental): string {
   return lines.join('\n');
 }
 const SECRET_NOTE = 'Connection details are secrets for this account: use them only in the user\'s own configuration and never paste them into public places.';
+
+/* ---------------------------------------------------------------- sandbox */
+
+/** First line of every account tool answer in sandbox mode. */
+export const SANDBOX_NOTICE = 'SANDBOX: this is a simulated ipvolt account inside this process. The balance, charges and rentals below are pretend. Nothing real was rented or charged, and no request was sent to ipvolt.';
+const SANDBOX_SUMMARY_PREFIX = 'Sandbox (simulated): ';
+const SANDBOX_DESCRIPTION = 'SANDBOX MODE (IPVOLT_SANDBOX=1): this tool acts on a simulated account inside this process. It sends no request to ipvolt, charges nothing and rents no real proxy. Stock, prices, balance and connection details are sample data, and they reset when the server restarts. With an API key instead of the sandbox, the tool does this:';
+const SANDBOX_CONNECTION_NOTE = 'These connection details are simulated: the host name cannot resolve and there is no proxy behind it.';
+const SANDBOX_NOTES: Record<string, string> = {
+  list_stock: 'These are sample offers and prices, not live stock. Current prices: https://ipvolt.com/pricing',
+  get_balance: `The sandbox starts with a pretend balance of ${money(SANDBOX_START_BALANCE_MINOR)} and no rentals, and resets when the server restarts.`,
+};
+function markSandbox(tool: string, outcome: Outcome): Outcome {
+  return {
+    output: { ...outcome.output, summary: SANDBOX_SUMMARY_PREFIX + outcome.output.summary, sandbox: true },
+    text: [SANDBOX_NOTICE, outcome.text, SANDBOX_NOTES[tool]].filter(Boolean).join('\n'),
+  };
+}
 function order(value: z.infer<typeof apiOrder>, currency: string) {
   return {
     orderId: value.orderId, status: value.status, replayed: value.replayed ?? false, chargedMinor: value.chargedMinor,
@@ -261,9 +277,13 @@ export class PreviewStore {
 
 /* ------------------------------------------------------------------- tools */
 
-export interface AccountTools { api: AccountApi; previews: PreviewStore }
+export interface AccountTools { api: AccountBackend; previews: PreviewStore; sandbox?: boolean }
 export function createAccountTools(config: AccountConfig, options: AccountApiOptions = {}): AccountTools {
   return { api: new AccountApi(config, options), previews: new PreviewStore() };
+}
+/** The same tools on the simulated account of sandbox mode: no key, no network. */
+export function createSandboxTools(options: SandboxOptions = {}): AccountTools {
+  return { api: new SandboxApi(options), previews: new PreviewStore(), sandbox: true };
 }
 
 const MAX_RESULT_BYTES = 256 * 1024;
@@ -280,21 +300,31 @@ export const ACCOUNT_TOOL_NAMES = ['list_stock', 'get_balance', 'rent_proxy', 'l
 
 export function registerAccountTools(server: McpServer, tools: AccountTools, onToolComplete?: (metric: AccountToolMetric) => void): void {
   const { api, previews } = tools;
+  const sandbox = tools.sandbox === true;
+  const failure = (error: ApiFailure, retry?: string): Outcome => describeFailure(error, retry, sandbox);
+  const localFailure = (code: string, message: string): Outcome => failure({ code, message, details: {} });
+  const unexpected = (status?: number): Outcome => failure({ code: 'unexpected_response', message: 'The ipvolt API answered in an unexpected format', ...(status ? { status } : {}), details: {} });
+  /** In sandbox mode the title, description and hints say what is true there: nothing leaves the process and nothing is spent. */
+  const describe = <A extends { destructiveHint: boolean; openWorldHint: boolean }>(title: string, description: string, annotations: A) => sandbox
+    ? { title: `${title} (sandbox)`, description: `${SANDBOX_DESCRIPTION} ${description}`, annotations: { ...annotations, destructiveHint: false, openWorldHint: false } }
+    : { title, description, annotations };
+  const connectionNote = sandbox ? SANDBOX_CONNECTION_NOTE : SECRET_NOTE;
 
   async function run(tool: string, operation: () => Promise<Outcome>): Promise<CallToolResult> {
     const start = performance.now();
     let status: 'ok' | 'error' = 'error';
     try {
+      const marked = (outcome: Outcome) => sandbox ? markSandbox(tool, outcome) : outcome;
       let outcome: Outcome;
-      try { outcome = await operation(); } catch { outcome = localFailure('internal_error', 'The tool could not complete this request'); }
+      try { outcome = marked(await operation()); } catch { outcome = marked(localFailure('internal_error', 'The tool could not complete this request')); }
       let encoded = JSON.stringify(outcome.output);
       // Defence in depth: no result may carry the API key, whatever the API answered.
       if (api.exposes(encoded) || api.exposes(outcome.text)) {
-        outcome = localFailure('unsafe_response', 'The answer was withheld because it contained the API key');
+        outcome = marked(localFailure('unsafe_response', 'The answer was withheld because it contained the API key'));
         encoded = JSON.stringify(outcome.output);
       }
       if (Buffer.byteLength(encoded) + Buffer.byteLength(outcome.text) > MAX_RESULT_BYTES) {
-        outcome = localFailure('response_too_large', 'The answer is larger than this tool returns');
+        outcome = marked(localFailure('response_too_large', 'The answer is larger than this tool returns'));
       }
       status = outcome.output.ok ? 'ok' : 'error';
       return {
@@ -315,9 +345,10 @@ export function registerAccountTools(server: McpServer, tools: AccountTools, onT
   };
 
   server.registerTool('list_stock', {
-    title: 'List mobile proxy stock and prices',
-    description: 'Read-only, free. List the mobile proxy rentals ipvolt sells now: country, carrier, length (1 or 30 days), price in US dollars and whether each is in stock. It never shows stock counts. Filter by country, carrier or length. Use it before rent_proxy.',
-    inputSchema: stockInputSchema, outputSchema: stockOutputSchema, annotations: readAnnotations,
+    ...describe('List mobile proxy stock and prices',
+      'Read-only, free. List the mobile proxy rentals ipvolt sells now: country, carrier, length (1 or 30 days), price in US dollars and whether each is in stock. It never shows stock counts. Filter by country, carrier or length. Use it before rent_proxy.',
+      readAnnotations),
+    inputSchema: stockInputSchema, outputSchema: stockOutputSchema,
   }, (input, context) => run('list_stock', async () => {
     const result = parsed(await api.get('/stock', { auth: false, signal: signalOf(context) }), apiStock);
     if ('outcome' in result) return result.outcome;
@@ -342,9 +373,10 @@ export function registerAccountTools(server: McpServer, tools: AccountTools, onT
   }));
 
   server.registerTool('get_balance', {
-    title: 'Show balance and API key limits',
-    description: 'Read-only, free. Show the prepaid ipvolt balance (available and held) and this API key\'s access level (read only or read and write), daily spending limit, what it spent today and what it can still spend today.',
-    inputSchema: emptyInputSchema, outputSchema: balanceOutputSchema, annotations: readAnnotations,
+    ...describe('Show balance and API key limits',
+      'Read-only, free. Show the prepaid ipvolt balance (available and held) and this API key\'s access level (read only or read and write), daily spending limit, what it spent today and what it can still spend today.',
+      readAnnotations),
+    inputSchema: emptyInputSchema, outputSchema: balanceOutputSchema,
   }, (_input, context) => run('get_balance', async () => {
     const signal = signalOf(context);
     const [balanceResult, keyResult] = await Promise.all([api.get('/balance', { signal }), api.get('/key', { signal })]);
@@ -376,9 +408,10 @@ export function registerAccountTools(server: McpServer, tools: AccountTools, onT
   }));
 
   server.registerTool('rent_proxy', {
-    title: 'Rent a mobile proxy (spends balance)',
-    description: 'SPENDS MONEY from the prepaid ipvolt balance. Rent mobile proxy devices for 1 or 30 days. Two steps: (1) call with country, carrier and days (and optional quantity) and without confirm: this only looks up the current price and returns the exact charge and a requestId; nothing is charged. (2) Only after the user approves that charge, call again with confirm: true and that requestId. The confirmed request carries the requestId as its idempotency key and the previewed price as the maximum, so repeating it never charges twice and a price rise is refused, not charged. Needs a read-write API key; the key\'s daily limit applies. The Acceptable Use Policy (https://ipvolt.com/acceptable-use) applies.',
-    inputSchema: rentInputSchema, outputSchema: rentOutputSchema, annotations: spendAnnotations,
+    ...describe('Rent a mobile proxy (spends balance)',
+      'SPENDS MONEY from the prepaid ipvolt balance. Rent mobile proxy devices for 1 or 30 days. Two steps: (1) call with country, carrier and days (and optional quantity) and without confirm: this only looks up the current price and returns the exact charge and a requestId; nothing is charged. (2) Only after the user approves that charge, call again with confirm: true and that requestId. The confirmed request carries the requestId as its idempotency key and the previewed price as the maximum, so repeating it never charges twice and a price rise is refused, not charged. Needs a read-write API key; the key\'s daily limit applies. The Acceptable Use Policy (https://ipvolt.com/acceptable-use) applies.',
+      spendAnnotations),
+    inputSchema: rentInputSchema, outputSchema: rentOutputSchema,
   }, (input, context) => run('rent_proxy', async () => {
     const signal = signalOf(context);
     if (input.confirm !== true) {
@@ -432,9 +465,10 @@ export function registerAccountTools(server: McpServer, tools: AccountTools, onT
   }));
 
   server.registerTool('list_rentals', {
-    title: 'List your active rentals',
-    description: 'Read-only, free. List this account\'s active proxy rentals with their connection details (host, ports, username, password), end time, online state, current IP and whether each can rotate or extend. The connection details are secrets: keep them in the user\'s own configuration.',
-    inputSchema: emptyInputSchema, outputSchema: rentalsOutputSchema, annotations: readAnnotations,
+    ...describe('List your active rentals',
+      'Read-only, free. List this account\'s active proxy rentals with their connection details (host, ports, username, password), end time, online state, current IP and whether each can rotate or extend. The connection details are secrets: keep them in the user\'s own configuration.',
+      readAnnotations),
+    inputSchema: emptyInputSchema, outputSchema: rentalsOutputSchema,
   }, (_input, context) => run('list_rentals', async () => {
     const result = parsed(await api.get('/rentals', { signal: signalOf(context) }), apiRentals);
     if ('outcome' in result) return result.outcome;
@@ -444,25 +478,27 @@ export function registerAccountTools(server: McpServer, tools: AccountTools, onT
       ? `${plural(result.value.rentals.length, 'active rental')}${truncated ? `; the first ${rentals.length} are shown` : ''}.`
       : 'No active rentals. list_stock shows what can be rented.';
     return ok({ summary, rentals, ...(truncated ? { truncated: true } : {}) },
-      [summary, ...rentals.map(describeRental), rentals.length ? SECRET_NOTE : ''].filter(Boolean).join('\n'));
+      [summary, ...rentals.map(describeRental), rentals.length ? connectionNote : ''].filter(Boolean).join('\n'));
   }));
 
   server.registerTool('get_rental', {
-    title: 'Show one rental',
-    description: 'Read-only, free. Show one of this account\'s active rentals with its connection details (host, ports, username, password), end time, online state, current IP and whether it can rotate or extend. The connection details are secrets: keep them in the user\'s own configuration.',
-    inputSchema: rentalInputSchema, outputSchema: rentalOutputSchema, annotations: readAnnotations,
+    ...describe('Show one rental',
+      'Read-only, free. Show one of this account\'s active rentals with its connection details (host, ports, username, password), end time, online state, current IP and whether it can rotate or extend. The connection details are secrets: keep them in the user\'s own configuration.',
+      readAnnotations),
+    inputSchema: rentalInputSchema, outputSchema: rentalOutputSchema,
   }, (input, context) => run('get_rental', async () => {
     const result = parsed(await api.get(`/rentals/${encodeURIComponent(input.rentalId)}`, { signal: signalOf(context) }), apiRental);
     if ('outcome' in result) return result.outcome;
     const value = rental(result.value);
     const described = describeRental(value);
-    return ok({ summary: described.split('\n')[0]!, rental: value }, `${described}\n${SECRET_NOTE}`);
+    return ok({ summary: described.split('\n')[0]!, rental: value }, `${described}\n${connectionNote}`);
   }));
 
   server.registerTool('rotate_ip', {
-    title: 'Rotate a rental\'s IP address',
-    description: 'CHANGES STATE, costs nothing. Ask for a new IP address on one of this account\'s rentals. Connections open through the device may drop while it changes. Rotating too soon is refused with the number of seconds to wait; the dashboard\'s limits apply. Needs a read-write API key. The Acceptable Use Policy (https://ipvolt.com/acceptable-use) applies.',
-    inputSchema: rentalInputSchema, outputSchema: rotateOutputSchema, annotations: rotateAnnotations,
+    ...describe('Rotate a rental\'s IP address',
+      'CHANGES STATE, costs nothing. Ask for a new IP address on one of this account\'s rentals. Connections open through the device may drop while it changes. Rotating too soon is refused with the number of seconds to wait; the dashboard\'s limits apply. Needs a read-write API key. The Acceptable Use Policy (https://ipvolt.com/acceptable-use) applies.',
+      rotateAnnotations),
+    inputSchema: rentalInputSchema, outputSchema: rotateOutputSchema,
   }, (input, context) => run('rotate_ip', async () => {
     const response = await api.post(`/rentals/${encodeURIComponent(input.rentalId)}/rotate`, { signal: signalOf(context) });
     const result = parsed(response, apiRotation);
@@ -481,9 +517,10 @@ export function registerAccountTools(server: McpServer, tools: AccountTools, onT
   }));
 
   server.registerTool('extend_rental', {
-    title: 'Extend a rental (spends balance)',
-    description: 'SPENDS MONEY from the prepaid ipvolt balance. Extend one of this account\'s active rentals by 1 or 30 days. Two steps: (1) call with rentalId and days and without confirm: this only looks up the current extension price and returns the exact charge and a requestId; nothing is charged. (2) Only after the user approves that charge, call again with confirm: true and that requestId. The confirmed request carries the requestId as its idempotency key and the previewed price as the maximum, so repeating it never charges twice and a price rise is refused, not charged. Needs a read-write API key; the key\'s daily limit applies.',
-    inputSchema: extendInputSchema, outputSchema: extendOutputSchema, annotations: spendAnnotations,
+    ...describe('Extend a rental (spends balance)',
+      'SPENDS MONEY from the prepaid ipvolt balance. Extend one of this account\'s active rentals by 1 or 30 days. Two steps: (1) call with rentalId and days and without confirm: this only looks up the current extension price and returns the exact charge and a requestId; nothing is charged. (2) Only after the user approves that charge, call again with confirm: true and that requestId. The confirmed request carries the requestId as its idempotency key and the previewed price as the maximum, so repeating it never charges twice and a price rise is refused, not charged. Needs a read-write API key; the key\'s daily limit applies.',
+      spendAnnotations),
+    inputSchema: extendInputSchema, outputSchema: extendOutputSchema,
   }, (input, context) => run('extend_rental', async () => {
     const signal = signalOf(context);
     const path = `/rentals/${encodeURIComponent(input.rentalId)}`;
