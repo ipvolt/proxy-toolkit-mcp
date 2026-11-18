@@ -161,7 +161,7 @@ const HINTS: Record<string, string> = {
 function describeFailure(error: ApiFailure, retry: string | undefined, sandbox: boolean): Outcome {
   const parts = [`${error.message.replace(/[.\s]+$/u, '')} (${error.code}).`];
   const d = error.details;
-  if (error.code === 'insufficient_balance' && d.missingMinor !== undefined) parts.push(`Your balance is ${money(d.missingMinor)} short${d.requiredMinor !== undefined ? ` of the ${money(d.requiredMinor)} required` : ''}. ${sandbox ? 'The sandbox balance cannot be topped up; restart the server to reset it.' : 'Add funds in the dashboard first.'}`);
+  if (error.code === 'insufficient_balance' && d.missingMinor !== undefined) parts.push(`Your balance is ${money(d.missingMinor)} short${d.requiredMinor !== undefined ? ` of the ${money(d.requiredMinor)} required` : ''}. ${sandbox ? 'The sandbox balance cannot be topped up; restart the server to reset it.' : 'Add funds in the dashboard, or pay your own USDC on Base through the top-up at https://ipvolt.com/api/v1 (see https://ipvolt.com/docs/api), then try again.'}`);
   if (error.code === 'price_above_max' && d.priceMinor !== undefined) parts.push(`The price is now ${money(d.priceMinor)}${d.maxPriceMinor !== undefined ? `, above the previewed ${money(d.maxPriceMinor)}` : ''}.`);
   if (error.code === 'daily_limit_exceeded' && d.remainingTodayMinor !== undefined) parts.push(`This key can spend ${money(d.remainingTodayMinor)} more today${d.resetsAt ? `; the limit resets at ${d.resetsAt}` : ''}.`);
   if (error.code === 'spend_cap_exceeded' && d.remainingMinor !== undefined) parts.push(`This credential can spend ${money(d.remainingMinor)} more.`);

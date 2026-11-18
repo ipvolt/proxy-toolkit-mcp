@@ -474,7 +474,7 @@ test('API refusals pass through: read-only key, insufficient balance and rotatio
     assert.equal(error.missingMinor, 300);
     assert.equal(error.requiredMinor, 900);
     assert.equal(error.availableMinor, 600);
-    assert.match(insufficient.structuredContent!.summary, /Your balance is \$3\.00 short of the \$9\.00 required/);
+    assert.match(insufficient.structuredContent!.summary, /Your balance is \$3\.00 short of the \$9\.00 required\. Add funds in the dashboard, or pay your own USDC on Base through the top-up at https:\/\/ipvolt\.com\/api\/v1 \(see https:\/\/ipvolt\.com\/docs\/api\), then try again\./);
     assert.equal(fake.state.balanceMinor, 600);
 
     const extend = okOf(await mcp.call('extend_rental', { rentalId: RENTAL, days: 30 }));
