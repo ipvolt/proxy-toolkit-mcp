@@ -3,11 +3,13 @@ import { configInputSchema, configOutputSchema, generateProxyConfig } from './co
 import { diagnosticsInputSchema, diagnosticsOutputSchema, diagnoseProxyError } from './core/diagnostics.js';
 import { documentInputSchema, documentOutputSchema, searchInputSchema, searchOutputSchema, loadPublicCatalog, type PublicCatalog } from './core/catalog.js';
 import { routeInputSchema, routeOutputSchema, type RouteChecker } from './local/route-check.js';
+import { registerAccountTools, type AccountTools } from './account/tools.js';
 import { SERVER_NAME, VERSION } from './meta.js';
 import { PUBLIC_ERRORS } from './protocol-safety.js';
 
 export type ToolMetric = {tool:string; status:'ok'|'error'; durationMs:number; version:string};
-export type ToolkitOptions = {catalog?:PublicCatalog; routeChecker?:RouteChecker; onToolComplete?:(metric:ToolMetric)=>void};
+/** `account` is supplied only by the local stdio entry when IPVOLT_API_KEY is set; the hosted HTTP service never passes it. */
+export type ToolkitOptions = {catalog?:PublicCatalog; routeChecker?:RouteChecker; account?:AccountTools; onToolComplete?:(metric:ToolMetric)=>void};
 const readOnly = {readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false};
 
 export function createToolkitServer(options:ToolkitOptions = {}): McpServer {
@@ -53,5 +55,6 @@ export function createToolkitServer(options:ToolkitOptions = {}): McpServer {
     inputSchema:routeInputSchema,outputSchema:routeOutputSchema,
     annotations:{...readOnly,idempotentHint:false,openWorldHint:true},
   },(input,context)=>invoke('check_proxy_route',()=>checker(input,{signal:context.mcpReq.signal})));
+  if (options.account) registerAccountTools(server,options.account,options.onToolComplete);
   return server;
 }

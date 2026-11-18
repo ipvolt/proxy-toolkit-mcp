@@ -2,6 +2,8 @@
 import { serveStdio, StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { createToolkitServer } from '../server.js';
 import { createRouteChecker } from '../local/route-check.js';
+import { readAccountConfig } from '../account/client.js';
+import { createAccountTools } from '../account/tools.js';
 import { VERSION } from '../meta.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/server';
 import { sanitizeProtocolMessage } from '../protocol-safety.js';
@@ -13,13 +15,16 @@ class SafeStdioTransport extends StdioServerTransport {
 function main():void {
   if (process.argv.length===3&&process.argv[2]==='--version') {process.stdout.write(VERSION+'\n');return;}
   if (process.argv.length===3&&process.argv[2]==='--help') {
-    process.stdout.write('ipvolt-proxy-toolkit [--help | --version]\n\nDefault: serve four public tools over MCP stdio.\nOptional local route check: IPVOLT_ENABLE_ROUTE_CHECK=1 and privately set IPVOLT_PROXY_URL.\nProxy HTTP CONNECT only; fixed https://mcp.ipvolt.com/egress destination.\nNever put credentials in tool arguments.\n');return;
+    process.stdout.write('ipvolt-proxy-toolkit [--help | --version]\n\nDefault: serve four public tools over MCP stdio.\nOptional local route check: IPVOLT_ENABLE_ROUTE_CHECK=1 and privately set IPVOLT_PROXY_URL.\nProxy HTTP CONNECT only; fixed https://mcp.ipvolt.com/egress destination.\nOptional account tools: privately set IPVOLT_API_KEY to an ipvolt API key.\nRenting and extending spend the prepaid balance and need confirmation.\nNever put credentials in tool arguments.\n');return;
   }
   if (process.argv.length!==2) throw new Error('Unsupported command-line arguments');
   const flag=process.env.IPVOLT_ENABLE_ROUTE_CHECK;
   if (flag!==undefined&&flag!=='0'&&flag!=='1') throw new Error('Invalid route enable flag');
   const checker=flag==='1'?createRouteChecker({enabled:true,proxyUrl:process.env.IPVOLT_PROXY_URL}):undefined;
-  const handle=serveStdio(()=>createToolkitServer({routeChecker:checker}),{
+  // Account tools exist only here, only with a key. One instance keeps rent/extend previews for the whole session.
+  const config=readAccountConfig(process.env);
+  const account=config?createAccountTools(config):undefined;
+  const handle=serveStdio(()=>createToolkitServer({routeChecker:checker,account}),{
     legacy:'serve',maxSubscriptions:0,
     transport:new SafeStdioTransport(process.stdin,process.stdout,{maxBufferSize:32_768}),
     onerror:()=>process.stderr.write('MCP transport rejected an invalid request.\n'),

@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ipvolt/proxy-toolkit",
   "title": "ipvolt Proxy Toolkit",
-  "description": "Proxy guides, tested configurations and error diagnostics, with an optional local route check.",
-  "version": "0.1.0",
+  "description": "Proxy guides, tested configs and error diagnostics; optional local tools to rent mobile proxies.",
+  "version": "0.2.0",
   "websiteUrl": "https://ipvolt.com",
   "repository": {
     "url": "https://github.com/ipvolt/proxy-toolkit-mcp",
@@ -14,7 +14,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@ipvolt/proxy-toolkit-mcp",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "runtimeHint": "npx",
       "transport": { "type": "stdio" },
       "environmentVariables": [
@@ -30,6 +30,13 @@
         {
           "name": "IPVOLT_PROXY_URL",
           "description": "Private HTTP proxy URL, required only when the local route diagnostic is enabled. Supply through the client's local secret environment; never as a tool argument.",
+          "format": "string",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "IPVOLT_API_KEY",
+          "description": "Optional ipvolt API key for the seven local account tools: stock, balance, rentals and IP rotation; renting and extending spend the prepaid balance after a confirmation step. Leave unset for the four public tools only.",
           "format": "string",
           "isRequired": false,
           "isSecret": true
