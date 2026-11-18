@@ -2,11 +2,11 @@
 
 An MCP server for finding reviewed proxy documentation, generating tested configuration examples and diagnosing structured proxy failures. The public tools run locally against a bundled catalog. They do not need an API key or access to an ipvolt proxy account.
 
-The toolkit is separate from ipvolt's commercial proxy service, which is not open yet. It does not provision proxies, buy traffic, access account data or configure another agent's network route.
+Without an API key, the toolkit does not provision proxies, spend money or access account data. With one, the optional [account tools](#account-tools-optional) let a local install rent and manage ipvolt mobile proxies paid from your prepaid balance. The toolkit never configures another agent's network route.
 
 ## Availability
 
-The published npm version 0.1.0 and public hosted service provide four tools using a bundled public catalog. Check [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md) for verified npm availability, the hosted endpoint and registry listings. Source builds work independently of those distribution channels. Registry metadata in `server.json` describes the intended release and is not evidence that a channel is live.
+The npm package and the public hosted service provide four tools using a bundled public catalog. Version 0.2.0 adds seven optional account tools to local (stdio) installs that set an API key; the hosted service never offers them. Check [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md) for verified npm availability, the hosted endpoint and registry listings. Source builds work independently of those distribution channels. Registry metadata in `server.json` describes the intended release and is not evidence that a channel is live.
 
 ## Tools
 
@@ -17,6 +17,8 @@ The published npm version 0.1.0 and public hosted service provide four tools usi
 | `generate_proxy_config` | Return an exact-version HTTPS GET template with local environment placeholders. It does not execute code. | Hosted and local |
 | `diagnose_proxy_error` | Interpret structured observations such as CONNECT407, TLS failure or an ambiguous timeout; state uncertainty and retry boundaries. | Hosted and local |
 | `check_proxy_route` | Make one bounded request through an explicitly configured local proxy to the fixed ipvolt echo endpoint. | Local, explicitly enabled |
+| `list_stock`, `get_balance`, `list_rentals`, `get_rental` | Read stock and prices, your balance and key limits, and your rentals with their connection details. | Local, with `IPVOLT_API_KEY` |
+| `rent_proxy`, `extend_rental`, `rotate_ip` | Rent or extend mobile proxies from your prepaid balance (after a confirmation step), or rotate a rental's IP. | Local, with a read-write `IPVOLT_API_KEY` |
 
 For example, search with `{"query":"curl proxy","topic":"setup"}`, then retrieve `{"documentId":"/guides/curl-proxy-setup"}`. Generate a synchronous HTTPX example with `{"client":"httpx","version":"0.28.1"}`. Diagnose a proxy authentication failure with `{"client":"httpx","version":"0.28.1","phase":"proxy_connect","status":407}`. A 407 observation points to proxy authentication; it does not establish whether a password, account state or access policy is responsible.
 
@@ -46,7 +48,7 @@ For a client that accepts a `mcpServers` configuration, use an absolute path to 
 }
 ```
 
-The default local server exposes four tools, sends no telemetry and makes no network requests. A client may send tool results to its own model provider. The server cannot control that client's data handling.
+Without `IPVOLT_API_KEY`, the local server exposes four tools, sends no telemetry and makes no network requests. A client may send tool results to its own model provider. The server cannot control that client's data handling.
 
 For the npm distribution, use the pinned package version after confirming its availability in release status:
 
@@ -55,7 +57,7 @@ For the npm distribution, use the pinned package version after confirming its av
   "mcpServers": {
     "ipvolt": {
       "command": "npx",
-      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.1.0"]
+      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.2.0"]
     }
   }
 }
@@ -86,9 +88,80 @@ Success reports the exit address seen by that one echo request. It does not prov
 
 The diagnostic requires the hosted echo service to be available. Check release status before enabling it. Controlled fixture checks do not claim a successful request through a live supplier.
 
+## Account tools (optional)
+
+With an ipvolt API key, a local stdio install adds seven tools that call the ipvolt customer API at `https://ipvolt.com/beta/api/v1`. Without the key they are not registered. The hosted service at `mcp.ipvolt.com` never offers them.
+
+| Tool | What it does | Cost |
+| --- | --- | --- |
+| `list_stock` | Countries, carriers, lengths (1 or 30 days), prices and whether each is in stock now. Never a stock count. | Free, read only |
+| `get_balance` | Available and held prepaid balance, and this key's access level, daily limit, spending today and what remains today. | Free, read only |
+| `list_rentals` | Your active rentals with their connection details (host, ports, username, password). | Free, read only |
+| `get_rental` | One active rental with its connection details. | Free, read only |
+| `rent_proxy` | Rent 1 to 20 devices for 1 or 30 days. | Charges the prepaid balance, after confirmation |
+| `extend_rental` | Extend an active rental by 1 or 30 days. | Charges the prepaid balance, after confirmation |
+| `rotate_ip` | Ask for a new IP address on a rental. Open connections through the device may drop. | Free; changes the device's IP |
+
+### Create a key
+
+Sign in to the ipvolt dashboard and open **Account settings → API keys**. The key is shown once; store it like a password. Each key has:
+
+- an access level: **read only** (`list_stock`, `get_balance`, `list_rentals`, `get_rental`; renting, rotating and extending are refused with `read_only_api_key`) or **read and write** (also rent, rotate and extend);
+- an optional **daily limit** from $1 to $10,000, which caps what the key can spend on rentals and extensions per UTC day. Without one, the balance is the limit. `get_balance` shows what the key can still spend today;
+- an expiry of 30 or 90 days. You can revoke a key at any time; it stops working at once.
+
+Use a read-only key unless the assistant needs to rent, rotate or extend, and give a read-write key a daily limit you are comfortable with.
+
+### Configure it
+
+Put the key only in your MCP client's local environment, never in a tool argument, a prompt or a file you share. The examples pin version 0.2.0; confirm it in [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md) first.
+
+Claude Desktop, in `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "ipvolt": {
+      "command": "npx",
+      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.2.0"],
+      "env": { "IPVOLT_API_KEY": "ipvolt_your_key" }
+    }
+  }
+}
+```
+
+Claude Code, reading the key from your shell so it stays out of the command history:
+
+```sh
+claude mcp add ipvolt -e IPVOLT_API_KEY="$IPVOLT_API_KEY" -- npx --yes @ipvolt/proxy-toolkit-mcp@0.2.0
+```
+
+This uses Claude Code's default local scope. Do not add it with `--scope project`, which writes the key into the repository's `.mcp.json`.
+
+Any other client that accepts `mcpServers` takes the same `env` entry, also with a source build (`"command": "node"`, `"args": ["/absolute/path/to/proxy-toolkit-mcp/dist/transports/stdio.js"]`). Restart the client after changing it.
+
+### How spending works
+
+- `rent_proxy` and `extend_rental` work in two steps. Called without `confirm: true`, they only look up the current price and answer with the exact charge and a `requestId`, for example: "Renting 1 × US Verizon for 30 days will charge $100.00 from your balance. To proceed, call rent_proxy again with confirm: true and requestId: …". Nothing is charged. Approve that charge before the assistant confirms it.
+- Called with `confirm: true` and that `requestId`, the tool sends the request with the `requestId` as its `Idempotency-Key` and the previewed price as the maximum per device. Repeating a confirm returns the same order and never charges twice. If the price rose in between, the API refuses the request instead of charging more.
+- If a confirm times out or the connection drops, its outcome is unknown. Repeat it with the same `requestId` to see the order; it cannot charge twice.
+- All charges come from the prepaid balance. The tools cannot add funds, withdraw or change the account. Add funds in the dashboard.
+- A preview is kept by the running server for 15 minutes. After a restart, preview again.
+- A new rental is charged when the order is accepted, and the device is usually ready within minutes: `list_rentals` then shows it. If setup fails, the money returns to the balance.
+- Refusals arrive with the API's error code and message, for example `insufficient_balance` with the missing amount, `daily_limit_exceeded` with what remains today, or `rotation_cooldown` with the seconds to wait.
+
+### Keys and connection details
+
+- The key travels only in the `Authorization` header of HTTPS requests to the API. The server never logs it, writes it to stderr or returns it in a result, and withholds any answer that contains it. The account tools refuse to start when Node network debugging, TLS key logging or disabled TLS verification is configured.
+- `list_rentals` and `get_rental` return your own rentals' connection details. Like any tool result, your MCP client passes them to its model. The server never logs them or writes them to stderr, and error messages never contain them.
+- The public stock list is read without the key. Every other request is made with it, and the API keeps each key's activity (time, action, result and amount charged; never the key, proxy credentials or request bodies) for 90 days under **Account settings → API keys → Activity**.
+- `IPVOLT_API_BASE` replaces the API address for local testing. It must be `https`, or `http` only for `127.0.0.1` or `localhost`.
+
+The [Acceptable Use Policy](https://ipvolt.com/acceptable-use) applies to everything done through the API, including these tools.
+
 ## Hosted service
 
-The public remote URL is `https://mcp.ipvolt.com/mcp`, using Streamable HTTP. Select that transport in your MCP client and enter the URL. Public HTTPS, all four tools on both supported protocol versions, and the echo endpoint were verified on 14 September 2026; see [hosted verification](docs/hosted-publication-2026-09-14.json). It exposes the four public tools without signup or an API key. The local route diagnostic is omitted and direct attempts to call it are rejected. No proxy configuration is accepted by this service.
+The public remote URL is `https://mcp.ipvolt.com/mcp`, using Streamable HTTP. Select that transport in your MCP client and enter the URL. Public HTTPS, all four tools on both supported protocol versions, and the echo endpoint were verified on 14 September 2026; see [hosted verification](docs/hosted-publication-2026-09-14.json). It exposes the four public tools without signup or an API key. The local route diagnostic and the account tools are omitted and direct attempts to call it are rejected. No proxy configuration is accepted by this service.
 
 For a local development instance:
 
@@ -112,7 +185,7 @@ npm run check:package
 python3 -m unittest discover -s deploy -p 'test_*.py' -v
 ```
 
-`check:package` inspects the actual npm tarball, installs it in a temporary consumer directory and discovers/calls all four tools with the current and legacy protocol paths. `check:content -- --live` compares every bundled Markdown document to its public canonical export; it performs only those allowlisted public reads.
+`check:package` inspects the actual npm tarball, installs it in a temporary consumer directory and discovers/calls all four tools with the current and legacy protocol paths. It also checks that an API key adds the seven account tools; the account tests in `tests/account-tools.test.ts` run them against a local stand-in for the API. `check:content -- --live` compares every bundled Markdown document to its public canonical export; it performs only those allowlisted public reads.
 
 The runtime does not crawl the website. A maintainer exports only the reviewed public guide/blog catalogs from a verified website source using `scripts/export-content.ts`, reviews the resulting diff and publishes a new immutable package version. Drafts and private operational applications are outside that allowlist. Bundle and document SHA-256 values make source changes observable.
 
