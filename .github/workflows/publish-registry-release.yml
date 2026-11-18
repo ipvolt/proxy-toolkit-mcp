@@ -35,8 +35,10 @@ jobs:
           set -euo pipefail
           version="$(python3 -c 'import json; print(json.load(open("server.json"))["version"])')"
           [[ "$version" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$ ]]
-          # The guard requires the metadata to descend from the source this npm version was built from.
-          git fetch --no-tags --force origin "refs/tags/v${version}:refs/tags/v${version}"
+          # The guard requires the metadata to descend from the source this npm version was built from,
+          # and to be merged into main.
+          git fetch --no-tags --force origin "refs/tags/v${version}:refs/tags/v${version}" \
+            "+refs/heads/main:refs/remotes/origin/main"
       - name: Verify the tagged metadata, the public npm version and the unused Registry version
         run: python3 registry/release/check.py preflight
       - name: Set up the reviewed Node runtime
@@ -48,8 +50,7 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Test publication guards
         run: |
-          python3 -m unittest discover -s registry/npm -p 'test_*.py' -v
-          python3 -m unittest discover -s registry/hosted -p 'test_*.py' -v
+          # The 0.1.0 and 0.1.1 suites are frozen to their own source state and are not run here.
           python3 -m unittest discover -s registry/release -p 'test_*.py' -v
           node --import tsx --test registry/hosted/check-remote.test.mjs
       - name: Download and verify the official publisher

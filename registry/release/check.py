@@ -5,6 +5,8 @@ The version is the one in package.json and server.json. The npm version of the s
 already be public, the Registry must not hold it yet, and the hosted remote must answer.
 """
 import argparse
+import base64
+import binascii
 import hashlib
 import importlib.util
 import json
@@ -33,6 +35,12 @@ REPOSITORY_URLS = ("https://github.com/ipvolt/proxy-toolkit-mcp.git", "git+https
 VERSION_PATTERN = re.compile(r"(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})")
 # Versions published by the two frozen workflows; this guard never republishes them.
 FROZEN_VERSIONS = ("0.1.0", "0.1.1")
+# A version the Registry is known to hold. Reading it first proves the endpoint answers as expected, so that a
+# 404 for the new version means "not published" and not "the address changed".
+KNOWN_PUBLISHED_VERSION = "0.1.1"
+SOURCE_REPOSITORY = "https://github.com/ipvolt/proxy-toolkit-mcp"
+NPM_WORKFLOW = ".github/workflows/publish.yml"
+PROVENANCE_TYPE = "https://slsa.dev/provenance/v1"
 
 
 def release_ref(version):
@@ -41,6 +49,10 @@ def release_ref(version):
 
 def npm_url(version):
     return f"https://registry.npmjs.org/@ipvolt%2fproxy-toolkit-mcp/{version}"
+
+
+def attestations_url(version):
+    return f"https://registry.npmjs.org/-/npm/v1/attestations/@ipvolt%2fproxy-toolkit-mcp@{version}"
 
 
 def registry_url(version):
@@ -92,14 +104,22 @@ def check_local(dispatch=False):
     if dispatch:
         verify_dispatch(os.environ, npm.git("rev-parse", "HEAD").decode().strip(), manifest["version"])
         require(not npm.git("status", "--porcelain", "--untracked-files=no"), "Tracked checkout is modified")
-        # The metadata must descend from the source that npm version was built from.
-        npm.git("merge-base", "--is-ancestor", f"refs/tags/v{manifest['version']}", "HEAD")
+        # The metadata must descend from the source that npm version was built from, and be merged.
+        npm.git("merge-base", "--is-ancestor", source_commit(manifest["version"]), "HEAD")
+        npm.git("merge-base", "--is-ancestor", "HEAD", "refs/remotes/origin/main")
     return manifest
+
+
+def source_commit(version):
+    commit = npm.git("rev-parse", "--verify", f"refs/tags/v{version}^{{commit}}").decode().strip()
+    require(re.fullmatch(r"[0-9a-f]{40}", commit), "Unexpected source tag")
+    return commit
 
 
 def fetch_json(url, allow_missing=False):
     # Fixed HTTPS public endpoints; no credentials, no redirects, no proxy.
     require(re.fullmatch(r"https://registry\.npmjs\.org/@ipvolt%2fproxy-toolkit-mcp/[0-9.]{5,14}"
+                         r"|https://registry\.npmjs\.org/-/npm/v1/attestations/@ipvolt%2fproxy-toolkit-mcp@[0-9.]{5,14}"
                          r"|https://registry\.modelcontextprotocol\.io/v0\.1/servers/io\.github\.ipvolt%2Fproxy-toolkit/versions/[0-9.]{5,14}",
                          url), "Unexpected verification endpoint")
     request = urllib.request.Request(url, headers={"Accept": "application/json"})
@@ -136,9 +156,38 @@ def verify_npm_metadata(metadata, version):
     # Versions after 0.1.0 are published by the repository's workflow through npm trusted publishing.
     attestations = distribution.get("attestations")
     require(isinstance(attestations, dict) and isinstance(attestations.get("provenance"), dict)
-            and attestations["provenance"].get("predicateType") == "https://slsa.dev/provenance/v1",
+            and attestations["provenance"].get("predicateType") == PROVENANCE_TYPE,
             "Public npm version has no build provenance")
     return distribution["integrity"]
+
+
+def verify_provenance(response, version, integrity, commit):
+    """npm's stored provenance statement must name this package, archive, repository, workflow, tag and commit.
+
+    This compares the statement npm serves; it does not verify the Sigstore signature, which npm checks at publication.
+    """
+    require(isinstance(response, dict) and isinstance(response.get("attestations"), list), "Unexpected attestation shape")
+    entries = [entry for entry in response["attestations"]
+               if isinstance(entry, dict) and entry.get("predicateType") == PROVENANCE_TYPE]
+    require(len(entries) == 1, "Expected one build provenance statement")
+    try:
+        payload = entries[0]["bundle"]["dsseEnvelope"]["payload"]
+        statement = npm.parse_json(base64.b64decode(payload, validate=True))
+        subject = statement["subject"]
+        build = statement["predicate"]["buildDefinition"]
+        workflow = build["externalParameters"]["workflow"]
+        resolved = build["resolvedDependencies"]
+        archive = base64.b64decode(integrity.removeprefix("sha512-"), validate=True).hex()
+    except (KeyError, TypeError, AttributeError, binascii.Error, ValueError) as error:
+        raise CheckError("Unexpected provenance statement") from error
+    require(statement.get("predicateType") == PROVENANCE_TYPE, "Unexpected provenance type")
+    require(subject == [{"name": f"pkg:npm/%40ipvolt/proxy-toolkit-mcp@{version}", "digest": {"sha512": archive}}],
+            "Provenance names another package or archive")
+    require(workflow == {"ref": f"refs/tags/v{version}", "repository": SOURCE_REPOSITORY, "path": NPM_WORKFLOW},
+            "Provenance names another repository, workflow or tag")
+    require(isinstance(resolved, list) and len(resolved) == 1 and isinstance(resolved[0], dict)
+            and resolved[0].get("uri") == f"git+{SOURCE_REPOSITORY}@refs/tags/v{version}"
+            and resolved[0].get("digest") == {"gitCommit": commit}, "Provenance commit differs from the source tag")
 
 
 def check_remote():
@@ -164,7 +213,13 @@ def main():
     integrity = None
     if arguments.action in ("public-npm", "preflight", "prepublish"):
         integrity = verify_npm_metadata(fetch_json(npm_url(version)), version)
+        verify_provenance(fetch_json(attestations_url(version)), version, integrity, source_commit(version))
     if arguments.action in ("preflight", "prepublish"):
+        known = fetch_json(registry_url(KNOWN_PUBLISHED_VERSION))
+        require(isinstance(known, dict) and isinstance(known.get("server"), dict)
+                and known["server"].get("version") == KNOWN_PUBLISHED_VERSION
+                and known.get("_meta", {}).get("io.modelcontextprotocol.registry/official", {}).get("status") == "active",
+                "Registry did not return the known published version")
         require(fetch_json(registry_url(version), allow_missing=True) is None,
                 f"Registry {version} already exists; inspect read-back before any retry")
     remote = check_remote() if arguments.action in ("remote", "prepublish") else None
