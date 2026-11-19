@@ -8,7 +8,7 @@ As of 14 September 2026, the source repository, npm package, hosted endpoint, of
 | [npm `@ipvolt/proxy-toolkit-mcp`](https://www.npmjs.com/package/@ipvolt/proxy-toolkit-mcp) | Version `0.3.0` published on 18 November 2026 through GitHub Actions OIDC trusted publishing, with an SLSA provenance statement, and tagged `latest`; a fresh installation lists the four tools without a key, eleven with `IPVOLT_API_KEY` and eleven, simulated, with `IPVOLT_SANDBOX=1`. `0.1.0` and `0.2.0` stay published | None; [evidence](npm-publication-2026-09-14.json) |
 | Hosted MCP and echo | `https://mcp.ipvolt.com/mcp` live; trusted TLS and all four tools verified | None; [evidence](hosted-publication-2026-09-14.json) |
 | [Official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.ipvolt%2Fproxy-toolkit/versions/0.3.0) | Version `0.3.0` active and latest since 18 November 2026, with the verified remote and npm `0.3.0`; `0.1.0`, `0.1.1` and `0.2.0` stay active | None; [publication run](https://github.com/ipvolt/proxy-toolkit-mcp/actions/runs/44393970693) |
-| Official MCP Registry, second entry `io.github.ipvolt/account` | Prepared in `registry/account/server.json` (remote-only: the account server at `https://ipvolt.com/beta/mcp`, live since 19 November 2026); not published yet | Dispatch `publish-registry-account.yml` on tag `registry-account-v1.0.0`, then record the read-back here |
+| [Official MCP Registry, second entry `io.github.ipvolt/account`](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.ipvolt%2Faccount/versions/1.0.0) | Version `1.0.0` active and latest since 19 November 2026: remote-only, the account server at `https://ipvolt.com/beta/mcp` | None; [publication run](https://github.com/ipvolt/proxy-toolkit-mcp/actions/runs/44439643555) |
 | [Smithery](https://smithery.ai/servers/ipvolt/proxy-toolkit) | Public listing and all four tools visible without signing in | Metadata save returned a permission error; gateway requires Smithery authorization |
 | Glama | Source and remote submitted once each on 14 September 2026 | Moderation pending; no public listing URL has been issued |
 | PulseMCP | Submission pause confirmed in its browser page on 14 September 2026 | Wait for its submission process to reopen |
@@ -25,6 +25,12 @@ Source tag [`v0.3.0`](https://github.com/ipvolt/proxy-toolkit-mcp/releases/tag/v
 ## Version 0.2.0
 
 Adds seven optional account tools for local stdio installs with `IPVOLT_API_KEY`: `list_stock`, `get_balance`, `list_rentals`, `get_rental`, `rotate_ip`, `rent_proxy` and `extend_rental`. Source tag [`v0.2.0`](https://github.com/ipvolt/proxy-toolkit-mcp/releases/tag/v0.2.0); published by the [publish workflow](https://github.com/ipvolt/proxy-toolkit-mcp/actions/workflows/publish.yml) through the package's npm trusted publisher (`publish.yml`, environment `npm`, publish only), with provenance. The hosted service is unchanged. The Registry version for npm `0.2.0` followed the same day; see Official Registry versions.
+
+## Account server entry
+
+The Registry entry `io.github.ipvolt/account` version `1.0.0` was published at `2026-11-19T01:48:41Z` from commit `a9a05e6b3f52c74fd941d3c7c86e2d9601f8fab8`, tag `registry-account-v1.0.0`, by `publish-registry-account.yml` through GitHub OIDC ([run 44439643555](https://github.com/ipvolt/proxy-toolkit-mcp/actions/runs/44439643555)). Before publishing, the guard confirmed the reviewed entry, the merged commit, the unused version and the public remote: asked without a credential, `https://ipvolt.com/beta/mcp` reported server `ipvolt-account` version `1.0.0`, listed the eight account tools and the three per-GB traffic tools, answered `list_stock` and `how_to_buy`, and refused `get_balance` and a `rent_proxy` preview. A separate read-back after the run found the exact entry active and latest: one Streamable HTTP remote and one optional, secret `Authorization` header. The Registry's search for "ipvolt" lists both entries.
+
+The entry lists a server that is not built from this repository. Its version follows the server's own; see [publishing](publishing.md).
 
 ## npm artifact and clients
 
