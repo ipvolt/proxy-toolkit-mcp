@@ -210,6 +210,12 @@ The process binds to loopback. Production configuration and coordinated rollback
 
 Hosted metrics contain only the tool name, success/error status, duration and toolkit version. Tool arguments, result bodies, credentials and exit addresses are not logged. Rate limiting retains temporary keyed address hashes for up to 60 seconds; local stdio usage is untracked. Machine endpoints use `noindex` and remain separate from the public website's consent-controlled analytics.
 
+## ipvolt account server (remote)
+
+ipvolt also runs a second, separate MCP server at `https://ipvolt.com/beta/mcp` (Streamable HTTP). It is part of the ipvolt customer app, not of this package, and its source is not in this repository. Without a credential it lists the mobile proxies on sale with their prices. With an ipvolt API key in the `Authorization` header (`Bearer`, a space, the key) it reads your balance and rentals, rotates an IP, and rents or extends from your prepaid balance: it shows the exact charge first and charges only when you confirm it. A read-only key cannot spend, and a key's daily limit applies. See [ipvolt.com/mcp](https://ipvolt.com/mcp) for the tools and a configuration example.
+
+Use it when your client connects to remote servers and you want no local install. Use the account tools of this package (above) when you prefer a local stdio server; both call the same customer API under the same rules. The hosted toolkit at `mcp.ipvolt.com` stays as it is: four public tools, no key.
+
 ## Maintain and verify
 
 ```sh
