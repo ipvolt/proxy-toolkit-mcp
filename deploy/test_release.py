@@ -328,10 +328,9 @@ class ReleaseTests(unittest.TestCase):
                 self.prepare(); self.activate(); live = self.autofix(); self.prepare("4.0.1"); upgraded = self.activate("second", live)
                 path = self.paths.releases / live / relative; original = path.read_bytes()
                 self.unlocked(path, lambda: path.write_bytes(original + b" "))
-                if relative != "release-manifest.json":
-                    with self.assertRaisesRegex(deploy.DeploymentError, "changed after it was recorded"):
-                        deploy.rollback(self.paths, self.host, upgraded["transaction"], "website-base", "second")
-                    self.assertEqual(self.paths.current.resolve().name, "second")
+                with self.assertRaisesRegex(deploy.DeploymentError, "changed after it was recorded"):
+                    deploy.rollback(self.paths, self.host, upgraded["transaction"], "website-base", "second")
+                self.assertEqual(self.paths.current.resolve().name, "second")
                 self.unlocked(path, lambda: path.write_bytes(original))
                 shutil.rmtree(self.unfreeze(self.paths.releases / "first"))
                 self.assertEqual(deploy.rollback(self.paths, self.host, upgraded["transaction"], "website-base", "second")["restoredRelease"], live)
@@ -446,12 +445,70 @@ class ReleaseTests(unittest.TestCase):
         live = self.autofix(change=lambda target: self.package(target, "@s/a", "2.0.0")); self.prepare("4.0.1", **{"@s__a": "1.9.9"})
         with self.assertRaisesRegex(deploy.DeploymentError, "unrecognized version of @s/a"): self.activate("second", live)
 
+    def test_an_unrelated_copy_hides_no_downgrade(self):
+        def running(target):
+            self.package(target, "a/node_modules/zod", "3.25.0"); self.package(target, "fixture/test/node_modules/zod", "0.0.1")
+        self.prepare(a="1.0.0"); self.activate(); live = self.autofix(version="4.0.10", change=running)
+        refused = {"same minimum": ("4.0.1", {"a__node_modules__zod": "3.25.0"}), "fixture": ("4.0.0", {"fixture__test__node_modules__zod": "0.0.1"}),
+                   "older second copy": ("4.0.10", {"a__node_modules__zod": "3.24.9"}), "line it does not run": ("4.0.10", {"a__node_modules__zod": "0.0.0"}),
+                   "dist copy": ("4.0.10", {"dist": "1.0.0"})}
+        for number, (name, (version, others)) in enumerate(refused.items()):
+            with self.subTest(name):
+                self.prepare(version, **{k: v for k, v in {"a": "1.0.0", **others}.items() if k != "dist"})
+                if "dist" in others:
+                    folder = self.source / "dist/node_modules/zod"; folder.mkdir(parents=True); (folder / "package.json").write_text(json.dumps({"name": "zod", "version": "4.0.1"}))
+                with self.assertRaisesRegex(deploy.DeploymentError, "unrecognized version of zod"): self.activate("bad" + str(number), live)
+        shutil.rmtree(self.source / "dist/node_modules")
+        allowed = (("4.0.11", {"a__node_modules__zod": "3.25.1"}), ("5.0.0", {}), ("4.0.10", {"a__node_modules__zod": "4.0.10"}))
+        for number, (version, others) in enumerate(allowed):
+            with self.subTest(version + str(others)):
+                self.prepare(version, a="1.0.0", **others)
+                self.assertIsNotNone(deploy.prepare_candidate(self.paths, self.host, "ok" + str(number), self.stage("ok" + str(number), live)["sha256"], "website-base", live, "/usr/local/bin/node"))
+
+    def test_the_floor_is_the_highest_copy_of_the_same_line_and_else_the_lowest_copy(self):
+        def running(second):
+            return lambda target: self.package(target, "a/node_modules/zod", second)
+        self.prepare(a="1.0.0"); self.activate(); live = self.autofix(version="4.0.10", change=running("4.0.7")); self.prepare("4.0.8", a="1.0.0", a__node_modules__zod="4.0.10")
+        with self.assertRaisesRegex(deploy.DeploymentError, "unrecognized version of zod"): self.activate("second", live)
+        self.tearDown(); self.setUp(); self.prepare(a="1.0.0"); self.activate(); live = self.autofix(version="4.0.10", change=running("2.0.0"))
+        self.prepare("4.0.10", a="1.0.0", a__node_modules__zod="3.5.0"); self.activate("second", live)
+        self.assertEqual(self.paths.current.resolve().name, "second")
+
+    def test_prerelease_labels_order(self):
+        for older, newer in (("4.0.10-beta.2", "4.0.10-beta.10"), ("4.0.10-alpha", "4.0.10-beta"), ("4.0.10-rc.1", "4.0.10"), ("4.0.10-1", "4.0.10-alpha")):
+            with self.subTest(older + " < " + newer):
+                self.tearDown(); self.setUp(); self.prepare(older); self.activate(); live = self.autofix(version=newer); self.prepare(older)
+                with self.assertRaisesRegex(deploy.DeploymentError, "unrecognized version of zod"): self.activate("second", live)
+
+    def test_unrecognized_running_version_is_refused(self):
+        self.prepare("4.0.1"); self.activate(); live = self.autofix(version="latest"); self.prepare("4.0.1")
+        with self.assertRaisesRegex(deploy.DeploymentError, "unrecognized version of zod"): self.activate("second", live)
+
+    def test_recorded_tree_permissions_are_checked_on_return(self):
+        self.prepare(); self.activate(); live = self.autofix(); self.prepare("4.0.1"); upgraded = self.activate("second", live)
+        path = self.paths.releases / live / "node_modules/zod/index.js"; path.chmod(0o644)
+        with self.assertRaisesRegex(deploy.DeploymentError, "immutable permissions"): deploy.rollback(self.paths, self.host, upgraded["transaction"], "website-base", "second")
+        self.assertEqual(self.paths.current.resolve().name, "second")
+
     def test_unreadable_installed_packages_are_refused(self):
-        self.prepare(); self.activate(); live = self.autofix(change=lambda t: shutil.rmtree(t / "node_modules/zod")); self.prepare("4.0.1")
-        with self.assertRaisesRegex(deploy.DeploymentError, "could not be read"): self.activate("second", live)
-        self.tearDown(); self.setUp(); self.prepare(); self.activate(); live = self.autofix(); self.prepare("4.0.1")
-        (self.source / "node_modules/zod/package.json").write_text(json.dumps({"name": "zod"}))
-        with self.assertRaisesRegex(deploy.DeploymentError, "no name or version"): self.activate("second", live)
+        def write(text):
+            def change(target): (target / "node_modules/zod/package.json").write_text(text)
+            return change
+        bad = {"no version": write('{"name": "zod"}'), "list": write("[]"), "text": write('"zod"'), "malformed": write("{"), "deep": write("[" * 200000)}
+        for number, (name, change) in enumerate(bad.items()):
+            with self.subTest("running " + name):
+                self.tearDown(); self.setUp(); self.prepare(); self.activate(); live = self.autofix(change=change); self.prepare("4.0.1")
+                with self.assertRaisesRegex(deploy.DeploymentError, "cannot be read: node_modules/zod/package.json"): self.activate("second", live)
+        for name, change in bad.items():
+            with self.subTest("update " + name):
+                self.tearDown(); self.setUp(); self.prepare(); self.activate(); live = self.autofix(); self.prepare("4.0.1"); change(self.source)
+                with self.assertRaisesRegex(deploy.DeploymentError, "cannot be read: node_modules/zod/package.json"): self.activate("second", live)
+        for name in ("running", "update"):
+            with self.subTest("empty " + name):
+                self.tearDown(); self.setUp(); self.prepare(); self.activate()
+                live = self.autofix(change=(lambda t: shutil.rmtree(t / "node_modules/zod")) if name == "running" else None); self.prepare("4.0.1")
+                if name == "update": shutil.rmtree(self.source / "node_modules/zod")
+                with self.assertRaisesRegex(deploy.DeploymentError, "could not be read"): self.activate("second", live)
 
     def test_guard_is_mandatory_and_reexec_has_no_bypass(self):
         with patch.object(deploy, "GUARD", str(self.root / "missing-guard")):

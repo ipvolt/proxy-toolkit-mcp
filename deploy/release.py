@@ -240,6 +240,11 @@ def immutable_tree(target: Path):
     return artifact_files(target)
 
 
+def tree_digest(target: Path, files):
+    """The files of a release, and its manifest, which artifact_files leaves out."""
+    return artifact_digest({**files, "release-manifest.json": digest((target / "release-manifest.json").read_bytes())})
+
+
 def autofix_release(paths: Paths, release: str, recorded: str, required_hash: str):
     """Accept a current release that the security autofix made from the recorded one, and nothing else.
 
@@ -256,7 +261,7 @@ def autofix_release(paths: Paths, release: str, recorded: str, required_hash: st
         raise DeploymentError("Autofix release differs from the recorded release in more than its dependencies.")
     described = lambda path: {key: value for key, value in json.loads((path / "package.json").read_text()).items() if key not in ("dependencies", "devDependencies", "optionalDependencies", "overrides")}
     if described(target) != described(base): raise DeploymentError("Autofix release changed package metadata other than its dependencies.")
-    return artifact_digest(files)
+    return tree_digest(target, files)
 
 
 def recorded_release(paths: Paths, old, mcp: str, required_tree: str | None = None):
@@ -272,7 +277,7 @@ def recorded_release(paths: Paths, old, mcp: str, required_tree: str | None = No
 def recorded_tree(paths: Paths, release: str, tree: str):
     """A return to an autofix release needs only that release, exactly as it was recorded: never the one it was made from."""
     target = paths.releases / identifier(release)
-    if artifact_digest(immutable_tree(target)) != tree: raise DeploymentError("Autofix release changed after it was recorded; preserve and reconcile it.")
+    if tree_digest(target, immutable_tree(target)) != tree: raise DeploymentError("Autofix release changed after it was recorded; preserve and reconcile it.")
     return json.loads((target / "release-manifest.json").read_text())
 
 
@@ -280,13 +285,15 @@ def installed_versions(path: Path):
     """Every installed copy of every package, by its own name, as its files say; a lockfile may say something else."""
     found = {}
     for item in path.rglob("package.json"):
-        parts = item.relative_to(path).parts[:-1]
+        relative = item.relative_to(path)
+        parts = relative.parts[:-1]
         if "node_modules" not in parts: continue
         place = parts[len(parts) - parts[::-1].index("node_modules"):]
         if len(place) != (2 if place and place[0].startswith("@") else 1): continue
-        package = json.loads(item.read_text())
-        if not isinstance(package.get("name"), str) or not isinstance(package.get("version"), str):
-            raise DeploymentError("An installed package has no name or version.")
+        try: package = json.loads(item.read_text())
+        except (OSError, ValueError, RecursionError): package = None
+        if not isinstance(package, dict) or not isinstance(package.get("name"), str) or not isinstance(package.get("version"), str):
+            raise DeploymentError(f"An installed package cannot be read: {relative.as_posix()}")
         found.setdefault(package["name"], set()).add(package["version"])
     return found
 
@@ -301,14 +308,19 @@ def version_key(version: str):
 def refuse_older_dependencies(running: Path, candidate: Path):
     """An update of an autofix release must not bring back a dependency older than the one the autofix installed.
 
-    The lowest installed copy counts on both sides, so an old copy nested anywhere in the update is seen."""
+    Every installed copy of the update counts. One the running release does not have may not be below the highest copy
+    of its major line that it runs, or below the lowest copy it runs when it does not run that line. So an old copy
+    nested anywhere in the update is seen, and an unrelated old copy in the running release hides nothing."""
     before, after = installed_versions(running), installed_versions(candidate)
-    if not before: raise DeploymentError("The running release's installed packages could not be read.")
+    if not before or not after: raise DeploymentError("The installed packages of the running release or the update could not be read.")
     for name in sorted(before.keys() & after.keys()):
-        if before[name] == after[name]: continue
-        old, new = [version_key(v) for v in before[name]], [version_key(v) for v in after[name]]
-        if None in old or None in new or min(new) < min(old):
-            raise DeploymentError(f"The update would install an older or unrecognized version of {name} than the running release.")
+        added = after[name] - before[name]
+        if not added: continue
+        old, new = [version_key(v) for v in before[name]], [version_key(v) for v in added]
+        for version in new:
+            same_line = [v for v in old if v is not None and version is not None and v[0] == version[0]]
+            if version is None or None in old or version < (max(same_line) if same_line else min(old)):
+                raise DeploymentError(f"The update would install an older or unrecognized version of {name} than the running release.")
 
 
 class Host:
