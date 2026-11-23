@@ -5,16 +5,21 @@ As of 14 September 2026, the source repository, npm package, hosted endpoint, of
 | Channel | Verified state | Remaining dependency |
 | --- | --- | --- |
 | [Source repository](https://github.com/ipvolt/proxy-toolkit-mcp) | Public; npm source tagged [`v0.1.0`](https://github.com/ipvolt/proxy-toolkit-mcp/releases/tag/v0.1.0) | None for the initial release |
-| [npm `@ipvolt/proxy-toolkit-mcp`](https://www.npmjs.com/package/@ipvolt/proxy-toolkit-mcp) | Version `0.3.0` published on 18 November 2026 through GitHub Actions OIDC trusted publishing, with an SLSA provenance statement, and tagged `latest`; a fresh installation lists the four tools without a key, eleven with `IPVOLT_API_KEY` and eleven, simulated, with `IPVOLT_SANDBOX=1`. `0.1.0` and `0.2.0` stay published | None; [evidence](npm-publication-2026-09-14.json) |
-| Hosted MCP and echo | `https://mcp.ipvolt.com/mcp` live; trusted TLS and all four tools verified | None; [evidence](hosted-publication-2026-09-14.json) |
-| [Official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.ipvolt%2Fproxy-toolkit/versions/0.3.0) | Version `0.3.0` active and latest since 18 November 2026, with the verified remote and npm `0.3.0`; `0.1.0`, `0.1.1` and `0.2.0` stay active | None; [publication run](https://github.com/ipvolt/proxy-toolkit-mcp/actions/runs/44393970693) |
+| [npm `@ipvolt/proxy-toolkit-mcp`](https://www.npmjs.com/package/@ipvolt/proxy-toolkit-mcp) | Version `0.3.1` published on 23 November 2026 through GitHub Actions OIDC trusted publishing, with an SLSA provenance statement, and tagged `latest`; a fresh installation has the 22 documents of website release 20261123-seo-brief-1314. `0.1.0`, `0.2.0` and `0.3.0` stay published | None; [evidence](npm-publication-2026-09-14.json) |
+| Hosted MCP and echo | `https://mcp.ipvolt.com/mcp` live, reporting `0.3.1` since 23 November 2026; trusted TLS and all four tools verified on both protocol versions | None; [first publication evidence](hosted-publication-2026-09-14.json) |
+| [Official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.ipvolt%2Fproxy-toolkit/versions/0.3.1) | Version `0.3.1` active and latest since 23 November 2026, with the verified remote and npm `0.3.1`; `0.1.0`, `0.1.1`, `0.2.0` and `0.3.0` stay active | None; [publication run](https://github.com/ipvolt/proxy-toolkit-mcp/actions/runs/44393970693) |
 | [Official MCP Registry, second entry `io.github.ipvolt/account`](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.ipvolt%2Faccount/versions/1.0.0) | Version `1.0.0` active and latest since 19 November 2026: remote-only, the account server at `https://ipvolt.com/beta/mcp` | None; [publication run](https://github.com/ipvolt/proxy-toolkit-mcp/actions/runs/44439643555) |
-| [Smithery](https://smithery.ai/servers/ipvolt/proxy-toolkit) | Public listing and all four tools visible without signing in | Metadata save returned a permission error; gateway requires Smithery authorization |
+| [LobeHub](https://lobehub.com/mcp/ipvolt-proxy-toolkit-mcp) | Version `0.3.1` listed on 23 November 2026 | None |
+| Smithery | The listing at `smithery.ai/servers/ipvolt/proxy-toolkit` answered 404 on 23 November 2026 | Not resubmitted |
 | Glama | Source and remote submitted once each on 14 September 2026 | Moderation pending; no public listing URL has been issued |
 | PulseMCP | Submission pause confirmed in its browser page on 14 September 2026 | Wait for its submission process to reopen |
 | [Website landing](https://ipvolt.com/mcp) and [Markdown](https://ipvolt.com/mcp.md) | Live; public HTML and Markdown verified on 14 September 2026 | None for the initial release |
 
 Update channel states only from actual read-back. Direct endpoint tests do not establish directory gateway compatibility, and directory publication does not establish search indexing or traffic gains.
+
+## Version 0.3.1
+
+Refreshes the bundled documents and changes no tool. Source tag [`v0.3.1`](https://github.com/ipvolt/proxy-toolkit-mcp/releases/tag/v0.3.1) on commit `e769d8256d7727638f24948aae539c2f78d678d0`; published by [publish workflow run 45243384443](https://github.com/ipvolt/proxy-toolkit-mcp/actions/runs/45243384443). Registry `0.3.1` was published from tag `registry-v0.3.1` by [run 45244409305](https://github.com/ipvolt/proxy-toolkit-mcp/actions/runs/45244409305) after the hosted service reported the new version. The hosted release is the same commit; its 32 files shared with the npm archive are identical to it.
 
 ## Version 0.3.0
 
