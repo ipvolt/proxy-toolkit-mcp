@@ -272,6 +272,10 @@ class ReleaseTests(unittest.TestCase):
         # Site level (four spaces), not inside a handle block, and only once.
         hsts = [line for line in caddy.splitlines() if "Strict-Transport-Security" in line]
         self.assertEqual(hsts, ['    header Strict-Transport-Security "max-age=86400"'])
+        # The crawl policy: one group that admits every crawler, with Content Signals, and nothing disallowed.
+        robots = caddy.split("handle /robots.txt {", 1)[1].split("ROBOTS 200", 1)[0]
+        rules = [line.strip() for line in robots.splitlines()[2:] if line.strip() and not line.strip().startswith("#")]
+        self.assertEqual(rules, ["User-agent: *", "Content-Signal: search=yes, ai-input=yes, ai-train=yes", "Allow: /"])
 
     def test_bounded_json_and_sse_discovery(self):
         response = {"jsonrpc": "2.0", "id": 1, "result": {"tools": []}}
