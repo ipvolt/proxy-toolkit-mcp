@@ -4,9 +4,9 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // Maintainer-only build tool. This script is excluded from the npm artifact.
-const [sourceArg, release] = process.argv.slice(2);
-if (!sourceArg || !release || !/^[a-zA-Z0-9][a-zA-Z0-9-]{0,79}$/.test(release)) {
-  throw new Error('Usage: tsx scripts/export-content.ts VERIFIED_WEBSITE_SOURCE REVIEWED_RELEASE');
+const [sourceArg, release, scope] = process.argv.slice(2);
+if (!sourceArg || !release || !/^[a-zA-Z0-9][a-zA-Z0-9-]{0,79}$/.test(release) || (scope !== undefined && scope !== '--bundled-only')) {
+  throw new Error('Usage: tsx scripts/export-content.ts VERIFIED_WEBSITE_SOURCE REVIEWED_RELEASE [--bundled-only]');
 }
 const source = resolve(sourceArg);
 const output = new URL('../content/catalog.json', import.meta.url);
@@ -15,6 +15,8 @@ const { getPublishedGuides } = await import(pathToFileURL(resolve(source, 'src/l
 const { getPublishedPosts } = await import(pathToFileURL(resolve(source, 'src/lib/blog.ts')).href);
 const { renderPageMarkdown } = await import(pathToFileURL(resolve(source, 'src/lib/markdown.ts')).href);
 const hash = (text: string) => createHash('sha256').update(text).digest('hex');
+// --bundled-only refreshes the documents already in the bundle that are still published, and adds none.
+const bundled = scope ? new Set((JSON.parse(await readFile(output, 'utf8')).documents as {id: string}[]).map(d => d.id)) : null;
 const entries = [
   ...getPublishedGuides().map((g: {slug: string;title: string;description: string;updatedAt: string;category: string}) => ({
     id: `/guides/${g.slug}`, title: g.title, description: g.description, reviewedAt: g.updatedAt,
@@ -24,7 +26,7 @@ const entries = [
     if (p.draft) throw new Error('Published loader returned a draft');
     return {id: `/blog/${p.slug}`, title: p.title, description: p.description, reviewedAt: p.updatedAt, topic: 'analysis'};
   }),
-].sort((a,b) => a.id.localeCompare(b.id));
+].filter(entry => !bundled || bundled.has(entry.id)).sort((a,b) => a.id.localeCompare(b.id));
 const documents = entries.map(entry => {
   if (!/^\/(guides|blog)\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry.id)) throw new Error('Unexpected public document ID');
   const markdown = renderPageMarkdown(entry.id);

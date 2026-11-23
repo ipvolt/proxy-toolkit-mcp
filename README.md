@@ -6,7 +6,7 @@ Without an API key, the toolkit does not provision proxies, spend money or acces
 
 ## Availability
 
-The npm package and the public hosted service provide four tools using a bundled public catalog. Version 0.2.0 adds seven optional account tools to local (stdio) installs that set an API key, and version 0.3.0 adds a sandbox mode that runs them on a simulated account without a key; the hosted service never offers either. Check [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md) for verified npm availability, the hosted endpoint and registry listings. Source builds work independently of those distribution channels. Registry metadata in `server.json` describes the intended release and is not evidence that a channel is live.
+The npm package and the public hosted service provide four tools using a bundled public catalog. Version 0.2.0 adds seven optional account tools to local (stdio) installs that set an API key, and version 0.3.0 adds a sandbox mode that runs them on a simulated account without a key; the hosted service never offers either. Version 0.3.1 refreshes the bundled documents. Check [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md) for verified npm availability, the hosted endpoint and registry listings. Source builds work independently of those distribution channels. Registry metadata in `server.json` describes the intended release and is not evidence that a channel is live.
 
 ## Tools
 
@@ -57,7 +57,7 @@ For the npm distribution, use the pinned package version after confirming its av
   "mcpServers": {
     "ipvolt": {
       "command": "npx",
-      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.3.0"]
+      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.3.1"]
     }
   }
 }
@@ -111,7 +111,7 @@ Set `IPVOLT_SANDBOX=1` and no API key. The server then offers the same seven too
   "mcpServers": {
     "ipvolt-sandbox": {
       "command": "npx",
-      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.3.0"],
+      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.3.1"],
       "env": { "IPVOLT_SANDBOX": "1" }
     }
   }
@@ -121,7 +121,7 @@ Set `IPVOLT_SANDBOX=1` and no API key. The server then offers the same seven too
 With Claude Code:
 
 ```sh
-claude mcp add ipvolt-sandbox -e IPVOLT_SANDBOX=1 -- npx --yes @ipvolt/proxy-toolkit-mcp@0.3.0
+claude mcp add ipvolt-sandbox -e IPVOLT_SANDBOX=1 -- npx --yes @ipvolt/proxy-toolkit-mcp@0.3.1
 ```
 
 Then ask the assistant to list the stock, rent a proxy, show its connection details, rotate its IP and extend it.
@@ -151,7 +151,7 @@ Use a read-only key unless the assistant needs to rent, rotate or extend, and gi
 
 ### Configure it
 
-Put the key only in your MCP client's local environment, never in a tool argument, a prompt or a file you share. The examples pin version 0.3.0; confirm it in [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md) first.
+Put the key only in your MCP client's local environment, never in a tool argument, a prompt or a file you share. The examples pin version 0.3.1; confirm it in [release status](https://github.com/ipvolt/proxy-toolkit-mcp/blob/main/docs/release-status.md) first.
 
 Claude Desktop, in `claude_desktop_config.json`:
 
@@ -160,7 +160,7 @@ Claude Desktop, in `claude_desktop_config.json`:
   "mcpServers": {
     "ipvolt": {
       "command": "npx",
-      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.3.0"],
+      "args": ["--yes", "@ipvolt/proxy-toolkit-mcp@0.3.1"],
       "env": { "IPVOLT_API_KEY": "ipvolt_your_key" }
     }
   }
@@ -170,7 +170,7 @@ Claude Desktop, in `claude_desktop_config.json`:
 Claude Code, reading the key from your shell so it stays out of the command history:
 
 ```sh
-claude mcp add ipvolt -e IPVOLT_API_KEY="$IPVOLT_API_KEY" -- npx --yes @ipvolt/proxy-toolkit-mcp@0.3.0
+claude mcp add ipvolt -e IPVOLT_API_KEY="$IPVOLT_API_KEY" -- npx --yes @ipvolt/proxy-toolkit-mcp@0.3.1
 ```
 
 This uses Claude Code's default local scope. Do not add it with `--scope project`, which writes the key into the repository's `.mcp.json`.

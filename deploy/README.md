@@ -37,7 +37,7 @@ sudo python3 /path/to/reviewed/deploy/release.py stage \
   --expected-mcp none
 ```
 
-For an update, supply the reviewed MCP release instead of `none`. Staging uses a new directory under `/opt/ipvolt-mcp/releases/`, writes a file-hash manifest and freezes files to mode 0444/directories to 0555. It never overwrites a release. Record and review the returned `artifactSha256`; validation and activation require that exact hash and recheck both bytes and permissions.
+For an update, supply the reviewed MCP release instead of `none`. When the security autofix has replaced the running release, supply that release: validation and activation accept a `YYYYMMDD-secfix-…` release only while the recorded artifact is intact and the running tree differs from it in `package.json` dependency fields, `package-lock.json` and `node_modules/` alone, and they refuse an update that would install an older dependency than it runs. The transaction records the tree, and a rollback returns to it only while it is unchanged. Staging uses a new directory under `/opt/ipvolt-mcp/releases/`, writes a file-hash manifest and freezes files to mode 0444/directories to 0555. It never overwrites a release. Record and review the returned `artifactSha256`; validation and activation require that exact hash and recheck both bytes and permissions.
 
 Validate the inactive candidate on the actual VPS even while DNS is pending:
 

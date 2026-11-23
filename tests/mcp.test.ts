@@ -20,7 +20,7 @@ async function exercise(client:Client){
   for(const tool of list.tools){assert.equal(tool.inputSchema.type,'object');assert.equal(tool.outputSchema?.type,'object');}
   const search=data(await client.callTool({name:'search_proxy_docs',arguments:{query:'curl proxy',topic:'setup'}}));
   assert.ok(search.results.some((doc:any)=>doc.id==='/guides/curl-proxy-setup'));
-  assert.equal(search.provenance.sourceRelease,'20260914-hero-split');
+  assert.equal(search.provenance.sourceRelease,'20261123-seo-brief-1314');
   for(const entry of SUPPORTED_CLIENTS){
     const config=data(await client.callTool({name:'generate_proxy_config',arguments:{client:entry.client,version:entry.version}}));
     assert.equal(config.client,entry.client);assert.ok(config.code.includes('PROXY_URL'));
