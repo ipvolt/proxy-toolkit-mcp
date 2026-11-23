@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 export const ENDPOINT = 'https://mcp.ipvolt.com/mcp';
 export const PROTOCOLS = ['2025-11-25', '2026-07-28'];
 export const TOOLS = ['diagnose_proxy_error', 'generate_proxy_config', 'get_proxy_doc', 'search_proxy_docs'];
-const BUNDLE = 'c6679b20124395b58cc00aea571589d466364dc41271134fb3d27e8803c5255b';
+const BUNDLE = '60d8c77bc2ec74156636a340198c935d3b5dbc05fd940ecd4a9d090300a957af';
 const failure = () => new Error('Public remote verification failed');
 const require = condition => { if (!condition) throw failure(); };
 
@@ -77,7 +77,7 @@ export async function checkRemote({ fetchImplementation = globalThis.fetch, envi
           reconnectionOptions: { maxRetries: 0, initialReconnectionDelay: 100, maxReconnectionDelay: 100, reconnectionDelayGrowFactor: 1 },
         }));
         require(client.getServerVersion()?.name === 'ipvolt-proxy-toolkit');
-        require(client.getServerVersion()?.version === '0.1.0');
+        require(client.getServerVersion()?.version === '0.3.1');
         const list = await client.listTools();
         require(!list.nextCursor && JSON.stringify(list.tools.map(tool => tool.name).sort()) === JSON.stringify(TOOLS));
         require(client.getServerCapabilities()?.tools?.listChanged !== true);
@@ -101,7 +101,7 @@ export async function checkRemote({ fetchImplementation = globalThis.fetch, envi
         await client.close();
       }
     })()]);
-    return { ok: true, endpoint: ENDPOINT, protocols: PROTOCOLS, tools: TOOLS, toolCalls: 8, runtimeVersion: '0.1.0', bundleSha256: BUNDLE };
+    return { ok: true, endpoint: ENDPOINT, protocols: PROTOCOLS, tools: TOOLS, toolCalls: 8, runtimeVersion: '0.3.1', bundleSha256: BUNDLE };
   } catch { throw failure(); }
   finally {
     clearTimeout(timer);

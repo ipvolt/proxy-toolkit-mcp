@@ -4,7 +4,6 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import test from 'node:test';
 import { createHttpService } from '../../src/transports/http.ts';
-import { VERSION } from '../../src/meta.ts';
 import { checkRemote, ENDPOINT, verifyEnvironment } from './check-remote.mjs';
 
 async function fixture(tamper) {
@@ -22,9 +21,7 @@ async function fixture(tamper) {
       assert.ok(init.signal instanceof AbortSignal);
       calls.push(init);
       const response = await fetch(`http://127.0.0.1:${port}/mcp`, init);
-      // This guard is pinned to the published hosted runtime 0.1.0. The source stands in for it
-      // under that version, so the rest of the guard still checks the source's real hosted tools.
-      const body = (await response.text()).replaceAll(`"version":"${VERSION}"`, '"version":"0.1.0"');
+      const body = await response.text();
       return new Response([204, 205, 304].includes(response.status) ? null : (tamper ? tamper(body) : body), {
         status: response.status, headers: response.headers,
       });

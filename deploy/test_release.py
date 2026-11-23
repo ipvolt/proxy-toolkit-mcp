@@ -252,12 +252,15 @@ class ReleaseTests(unittest.TestCase):
 
     AUTOFIX = "20261113-secfix-202611130000-09ae51"
 
-    def lock(self, version): return json.dumps({"packages": {"": {}, "node_modules/zod": {"version": version}, "node_modules/tsx": {"version": "9.0.0", "dev": True}}})
+    def package(self, root, place, version, name=None):
+        folder = root / "node_modules" / place; folder.mkdir(parents=True, exist_ok=True)
+        (folder / "package.json").write_text(json.dumps({"name": name or place.rsplit("node_modules/", 1)[-1], "version": version}))
+        (folder / "index.js").write_text("// " + version + "\n")
 
-    def prepare_lock(self, version="4.0.0"):
-        (self.source / "package-lock.json").write_text(self.lock(version))
-        (self.source / "node_modules/zod").mkdir(exist_ok=True)
-        (self.source / "node_modules/zod/index.js").write_text("// " + version + "\n")
+    def prepare(self, version="4.0.0", **others):
+        shutil.rmtree(self.source / "node_modules"); (self.source / "node_modules").mkdir()
+        self.package(self.source, "zod", version)
+        for place, other in others.items(): self.package(self.source, place.replace("__", "/"), other)
 
     def autofix(self, base="first", name=None, version="4.0.1", change=None):
         """What the security autofix does: copy the live release, replace its dependencies, move current, record nothing."""
@@ -265,10 +268,9 @@ class ReleaseTests(unittest.TestCase):
         shutil.copytree(self.paths.releases / base, target)
         for item in [target, *target.rglob("*")]: item.chmod(0o755 if item.is_dir() else 0o644)
         package = json.loads((target / "package.json").read_text()); package["dependencies"] = {"zod": version}
-        (target / "package.json").write_text(json.dumps(package))
-        (target / "package-lock.json").write_text(self.lock(version))
-        (target / "node_modules/zod/index.js").write_text("// patched " + version + "\n")
-        (target / "node_modules/.package-lock.json").write_text("{}")
+        package["overrides"] = {"zod": version}; package["devDependencies"] = {"tsx": "9.0.0"}; package["optionalDependencies"] = {}
+        (target / "package.json").write_text(json.dumps(package)); (target / "package-lock.json").write_text(json.dumps({"lock": version}))
+        self.package(target, "zod", version); (target / "node_modules/.package-lock.json").write_text("{}")
         if change: change(target)
         for item in [target, *target.rglob("*")]:
             if not item.is_symlink(): item.chmod(0o555 if item.is_dir() else 0o444)
@@ -278,48 +280,81 @@ class ReleaseTests(unittest.TestCase):
     def unlocked(self, path, action):
         parent = path.parent; parent.chmod(0o755)
         if path.exists(): path.chmod(0o644)
-        action(); path.chmod(0o444); parent.chmod(0o555)
+        action()
+        if path.exists(): path.chmod(0o444)
+        parent.chmod(0o555)
+
+    def transaction(self, result): return self.paths.state / "transactions" / (result["transaction"] + ".json")
 
     def test_update_from_an_autofix_release_is_accepted_and_recorded(self):
-        self.prepare_lock(); self.activate(); live = self.autofix(); self.prepare_lock("4.0.1")
+        self.prepare(); self.activate(); live = self.autofix(); self.prepare("4.0.1")
         result = self.activate("second", live)
         self.assertEqual(self.paths.current.resolve().name, "second")
         self.assertEqual(json.loads(self.paths.active.read_text())["release"], "second")
-        record = json.loads((self.paths.state / "transactions" / (result["transaction"] + ".json")).read_text())
+        record = json.loads(self.transaction(result).read_text())
         self.assertEqual(record["oldRelease"], live); self.assertRegex(record["oldTree"], r"^[0-9a-f]{64}$")
 
-    def test_ordinary_update_records_no_tree(self):
-        self.prepare_lock(); self.activate(); result = self.activate("second", "first")
-        self.assertIsNone(json.loads((self.paths.state / "transactions" / (result["transaction"] + ".json")).read_text())["oldTree"])
+    def test_autofix_of_an_autofix_release_is_accepted(self):
+        self.prepare(); self.activate(); one = self.autofix(); two = self.autofix(base=one, name="20261120-secfix-2", version="4.0.2")
+        self.prepare("4.0.2"); self.activate("second", two)
+        self.assertEqual(self.paths.current.resolve().name, "second")
 
-    def test_failed_update_returns_to_the_autofix_release(self):
-        self.prepare_lock(); self.activate(); live = self.autofix(); self.prepare_lock("4.0.1")
+    def test_ordinary_update_records_no_tree_and_compares_no_dependencies(self):
+        self.prepare("4.0.1"); self.activate()
+        for number, version in enumerate(("4.0.0", "3.0.0-beta.1", "odd")):
+            with self.subTest(version):
+                self.prepare(version); result = self.activate("update" + str(number), "first" if number == 0 else "update" + str(number - 1))
+                self.assertIsNone(json.loads(self.transaction(result).read_text())["oldTree"])
+
+    def test_failed_update_returns_to_the_autofix_release_without_its_base(self):
+        self.prepare(); self.activate(); live = self.autofix(); self.prepare("4.0.1")
         before = self.paths.active.read_bytes(); self.host.fail_reload = 1
+        def alter(): # the base is damaged mid-cutover: the return must not depend on it
+            path = self.paths.releases / "first/dist/transports/http.js"; self.unlocked(path, lambda: path.write_text("// altered\n"))
+        original = self.host.health
+        def health(port, manifest):
+            if manifest["release"] == "second": alter()
+            return original(port, manifest)
+        self.host.health = health
         with self.assertRaisesRegex(deploy.DeploymentError, "restored and verified"): self.activate("second", live)
         self.assertEqual(self.paths.current.resolve().name, live)
         self.assertEqual(self.paths.active.read_bytes(), before); self.assertTrue(self.host.running())
-        self.assertIn("patched", (self.paths.current / "node_modules/zod/index.js").read_text())
+        self.assertIn("4.0.1", (self.paths.current / "node_modules/zod/index.js").read_text())
 
     def test_manual_rollback_returns_to_the_autofix_release_only_while_unchanged(self):
-        self.prepare_lock(); self.activate(); live = self.autofix(); self.prepare_lock("4.0.1")
-        upgraded = self.activate("second", live)
-        path = self.paths.releases / live / "node_modules/zod/index.js"; original = path.read_bytes()
-        self.unlocked(path, lambda: path.write_text("// altered later\n"))
-        with self.assertRaisesRegex(deploy.DeploymentError, "changed after it was recorded"):
-            deploy.rollback(self.paths, self.host, upgraded["transaction"], "website-base", "second")
-        self.assertEqual(self.paths.current.resolve().name, "second")
-        self.unlocked(path, lambda: path.write_bytes(original))
-        self.assertEqual(deploy.rollback(self.paths, self.host, upgraded["transaction"], "website-base", "second")["restoredRelease"], live)
-        self.assertEqual(self.paths.current.resolve().name, live)
+        for relative in ("node_modules/zod/index.js", "package.json", "dist/transports/http.js", "release-manifest.json"):
+            with self.subTest(relative):
+                self.tearDown(); self.setUp()
+                self.prepare(); self.activate(); live = self.autofix(); self.prepare("4.0.1"); upgraded = self.activate("second", live)
+                path = self.paths.releases / live / relative; original = path.read_bytes()
+                self.unlocked(path, lambda: path.write_bytes(original + b" "))
+                if relative != "release-manifest.json":
+                    with self.assertRaisesRegex(deploy.DeploymentError, "changed after it was recorded"):
+                        deploy.rollback(self.paths, self.host, upgraded["transaction"], "website-base", "second")
+                    self.assertEqual(self.paths.current.resolve().name, "second")
+                self.unlocked(path, lambda: path.write_bytes(original))
+                shutil.rmtree(self.unfreeze(self.paths.releases / "first"))
+                self.assertEqual(deploy.rollback(self.paths, self.host, upgraded["transaction"], "website-base", "second")["restoredRelease"], live)
+                self.assertEqual(self.paths.current.resolve().name, live)
+
+    def unfreeze(self, path):
+        for item in [path, *path.rglob("*")]:
+            if item.is_dir(): item.chmod(0o755)
+        return path
+
+    def test_transactions_of_the_older_tool_still_roll_back(self):
+        self.activate(); upgraded = self.activate("second", "first"); path = self.transaction(upgraded)
+        record = json.loads(path.read_text()); del record["oldTree"]; path.write_text(json.dumps(record))
+        self.assertEqual(deploy.rollback(self.paths, self.host, upgraded["transaction"], "website-base", "second")["restoredRelease"], "first")
 
     def test_rollback_to_an_autofix_release_needs_its_recorded_tree(self):
-        self.prepare_lock(); self.activate(); live = self.autofix(); self.prepare_lock("4.0.1")
-        upgraded = self.activate("second", live)
-        path = self.paths.state / "transactions" / (upgraded["transaction"] + ".json")
-        record = json.loads(path.read_text()); record["oldTree"] = None; path.write_text(json.dumps(record))
-        with self.assertRaisesRegex(deploy.DeploymentError, "not recorded with its tree"):
-            deploy.rollback(self.paths, self.host, upgraded["transaction"], "website-base", "second")
-        self.assertEqual(self.paths.current.resolve().name, "second")
+        self.prepare(); self.activate(); live = self.autofix(); self.prepare("4.0.1"); upgraded = self.activate("second", live)
+        path = self.transaction(upgraded); record = json.loads(path.read_text())
+        for value in (None, "0" * 64):
+            with self.subTest(value):
+                record["oldTree"] = value; path.write_text(json.dumps(record))
+                with self.assertRaises(deploy.DeploymentError): deploy.rollback(self.paths, self.host, upgraded["transaction"], "website-base", "second")
+                self.assertEqual(self.paths.current.resolve().name, "second")
 
     def test_autofix_release_that_changed_more_than_dependencies_is_refused(self):
         def metadata(key, value):
@@ -327,18 +362,19 @@ class ReleaseTests(unittest.TestCase):
                 data = json.loads((target / "package.json").read_text()); data[key] = value
                 (target / "package.json").write_text(json.dumps(data))
             return change
+        def write(relative, text="// new\n"):
+            def change(target): (target / relative).parent.mkdir(parents=True, exist_ok=True); (target / relative).write_text(text)
+            return change
         cases = {
-            "code": lambda t: (t / "dist/transports/http.js").write_text("// other\n"),
-            "content": lambda t: (t / "content/catalog.json").write_text("{}"),
-            "added": lambda t: (t / "dist/extra.js").write_text("// new\n"),
+            "code": write("dist/transports/http.js"), "content": write("content/catalog.json", "{}"), "added": write("dist/extra.js"),
             "removed": lambda t: (t / "deploy/check-host-isolation.mjs").unlink(),
-            "lookalike": lambda t: (t / "node_modules_extra.js").write_text("// new\n"),
-            "manifest": lambda t: (t / "release-manifest.json").write_text("{}"),
-            "version": metadata("version", "9.9.9"), "name": metadata("name", "other"), "scripts": metadata("scripts", {"start": "x"}),
-            "link": lambda t: (t / "node_modules/link").symlink_to("/etc/hosts"),
+            "lookalike": write("node_modules_extra.js"), "nested modules": write("dist/node_modules/x/index.js"),
+            "nested package": write("dist/package.json", "{}"), "nested lock": write("dist/package-lock.json", "{}"),
+            "manifest": write("release-manifest.json", "{}"), "link": lambda t: (t / "node_modules/link").symlink_to("/etc/hosts"),
+            **{key: metadata(key, "x") for key in ("name", "version", "type", "main", "exports", "imports", "scripts", "bin", "files")},
         }
-        reasons = {"version": "package metadata", "name": "package metadata", "scripts": "package metadata", "link": "ownership or immutable"}
-        self.prepare_lock(); self.activate(); self.prepare_lock("4.0.1"); base = self.paths.active.read_bytes()
+        reasons = {**{key: "package metadata" for key in ("name", "version", "type", "main", "exports", "imports", "scripts", "bin", "files")}, "link": "ownership or immutable"}
+        self.prepare(); self.activate(); self.prepare("4.0.1"); base = self.paths.active.read_bytes()
         for number, (name, change) in enumerate(cases.items()):
             with self.subTest(name):
                 live = self.autofix(name="20261113-secfix-case" + str(number), change=change)
@@ -346,35 +382,76 @@ class ReleaseTests(unittest.TestCase):
                 self.assertEqual(self.paths.current.resolve().name, live); self.assertEqual(self.paths.active.read_bytes(), base)
 
     def test_current_that_is_not_an_autofix_release_is_refused(self):
-        self.prepare_lock(); self.activate(); self.prepare_lock("4.0.1")
+        self.prepare(); self.activate(); self.prepare("4.0.1")
         for name in ("20261113-other-1", "secfix-1", "20261113-secfixed", "third"):
             with self.subTest(name):
                 live = self.autofix(name=name)
                 with self.assertRaisesRegex(deploy.DeploymentError, "neither the recorded release"): self.activate("update-" + name, live)
 
-    def test_writable_autofix_release_and_altered_base_are_refused(self):
-        self.prepare_lock(); self.activate(); live = self.autofix()
-        path = self.paths.releases / live / "node_modules/zod/index.js"; path.chmod(0o644)
-        with self.assertRaisesRegex(deploy.DeploymentError, "immutable permissions"): self.activate("second", live)
-        path.chmod(0o444); path = self.paths.releases / "first/dist/transports/http.js"
-        self.unlocked(path, lambda: path.write_text("// altered\n"))
-        with self.assertRaisesRegex(deploy.DeploymentError, "differs from the reviewed hash"): self.activate("third", live)
+    def test_autofix_permissions(self):
+        self.prepare(); self.activate(); live = self.autofix(); self.prepare("4.0.1"); root = self.paths.releases / live
+        cases = {"file": (root / "node_modules/zod/index.js", 0o644), "directory": (root / "dist", 0o755), "root": (root, 0o755), "own executable": (root / "dist/transports/http.js", 0o555)}
+        for number, (name, (path, mode)) in enumerate(cases.items()):
+            with self.subTest(name):
+                before = stat.S_IMODE(path.stat().st_mode); path.chmod(mode)
+                with self.assertRaisesRegex(deploy.DeploymentError, "immutable permissions"): self.activate("bad" + str(number), live)
+                path.chmod(before)
+        (root / "node_modules/zod/index.js").chmod(0o555)  # a dependency's own command stays executable
+        self.activate("second", live); self.assertEqual(self.paths.current.resolve().name, "second")
 
-    def test_update_may_not_bring_back_older_dependencies(self):
-        self.prepare_lock(); self.activate(); live = self.autofix(version="4.0.10")
-        for number, version in enumerate(("4.0.9", "4.0.0", "4.0.11-beta.1")):
-            with self.subTest(version):
-                self.prepare_lock(version)
-                with self.assertRaisesRegex(deploy.DeploymentError, "older or unrecognized"): self.activate("update" + str(number), live)
-        self.prepare_lock("4.1.0"); self.activate("newer", live)
-        self.assertEqual(self.paths.current.resolve().name, "newer")
-
-    def test_autofix_release_changed_during_validation_aborts_cutover(self):
-        self.prepare_lock(); self.activate(); live = self.autofix(); self.prepare_lock("4.0.1")
-        path = self.paths.releases / live / "node_modules/zod/index.js"
-        self.host.after_candidate = lambda: self.unlocked(path, lambda: path.write_text("// raced\n"))
+    def test_running_releases_are_verified_before_and_after_validation(self):
+        def damage(relative):
+            path = self.paths.releases / relative; self.unlocked(path, lambda: path.write_text("// altered\n"))
+        self.prepare(); self.activate(); damage("first/dist/transports/http.js")
+        with self.assertRaisesRegex(deploy.DeploymentError, "reviewed hash"): self.activate("second", "first")
+        self.tearDown(); self.setUp(); self.prepare(); self.activate()
+        self.host.after_candidate = lambda: damage("first/dist/transports/http.js")
+        with self.assertRaisesRegex(deploy.DeploymentError, "reviewed hash"): self.activate("second", "first")
+        self.assertEqual(self.paths.current.resolve().name, "first")
+        self.tearDown(); self.setUp(); self.prepare(); self.activate(); live = self.autofix(); self.prepare("4.0.1"); damage("first/dist/transports/http.js")
+        with self.assertRaisesRegex(deploy.DeploymentError, "reviewed hash"): self.activate("second", live)
+        self.tearDown(); self.setUp(); self.prepare(); self.activate(); live = self.autofix(); self.prepare("4.0.1")
+        self.host.after_candidate = lambda: damage(live + "/node_modules/zod/index.js")
         with self.assertRaisesRegex(deploy.DeploymentError, "changed after it was recorded"): self.activate("second", live)
         self.assertEqual(self.paths.current.resolve().name, live)
+
+    def test_managed_files_changed_outside_the_workflow_are_refused(self):
+        for name in ("unit", "env", "caddy"):
+            with self.subTest(name):
+                self.tearDown(); self.setUp(); self.prepare(); self.activate(); live = self.autofix(); self.prepare("4.0.1")
+                path = getattr(self.paths, name); data = path.read_bytes()
+                path.write_bytes(data.replace(b"mcp.ipvolt.com {", b"mcp.ipvolt.com  {", 1) if name == "caddy" else data + b"# operator\n")
+                self.assertNotEqual(path.read_bytes(), data)
+                with self.assertRaisesRegex(deploy.DeploymentError, "outside this release workflow"): self.activate("second", live)
+
+    def test_update_may_not_bring_back_older_installed_dependencies(self):
+        self.prepare(); self.activate(); live = self.autofix(version="4.0.10")
+        refused = {"older": dict(version="4.0.9"), "much older": dict(version="3.9.9"), "prerelease": dict(version="4.0.10-beta.1"), "unrecognized": dict(version="latest"),
+                   "nested copy": dict(version="4.0.10", a="1.0.0", a__node_modules__zod="4.0.1"), "scoped nested copy": {"version": "4.0.10", "@s__a": "1.0.0", "@s__a__node_modules__zod": "4.0.1"}}
+        for number, (name, versions) in enumerate(refused.items()):
+            with self.subTest(name):
+                self.prepare(**versions)
+                with self.assertRaisesRegex(deploy.DeploymentError, "unrecognized version of zod"): self.activate("bad" + str(number), live)
+        self.prepare("4.0.10"); (self.source / "node_modules/alias").mkdir()
+        (self.source / "node_modules/alias/package.json").write_text(json.dumps({"name": "zod", "version": "4.0.1"}))
+        with self.assertRaisesRegex(deploy.DeploymentError, "unrecognized version of zod"): self.activate("alias", live)
+        for number, version in enumerate(("4.0.10+build.1", "4.0.11", "5.0.0-rc.1", "4.0.10")):
+            with self.subTest(version):
+                self.prepare(version); self.assertIsNotNone(deploy.prepare_candidate(self.paths, self.host, "ok" + str(number), self.stage("ok" + str(number), live)["sha256"], "website-base", live, "/usr/local/bin/node"))
+        self.prepare("4.0.10"); shutil.rmtree(self.source / "node_modules/zod"); self.package(self.source, "other", "1.0.0")  # a removed package is no older copy
+        self.activate("removed", live); self.assertEqual(self.paths.current.resolve().name, "removed")
+
+    def test_scoped_dependencies_are_compared_too(self):
+        self.prepare(**{"@s__a": "1.0.0"}); self.activate()
+        live = self.autofix(change=lambda target: self.package(target, "@s/a", "2.0.0")); self.prepare("4.0.1", **{"@s__a": "1.9.9"})
+        with self.assertRaisesRegex(deploy.DeploymentError, "unrecognized version of @s/a"): self.activate("second", live)
+
+    def test_unreadable_installed_packages_are_refused(self):
+        self.prepare(); self.activate(); live = self.autofix(change=lambda t: shutil.rmtree(t / "node_modules/zod")); self.prepare("4.0.1")
+        with self.assertRaisesRegex(deploy.DeploymentError, "could not be read"): self.activate("second", live)
+        self.tearDown(); self.setUp(); self.prepare(); self.activate(); live = self.autofix(); self.prepare("4.0.1")
+        (self.source / "node_modules/zod/package.json").write_text(json.dumps({"name": "zod"}))
+        with self.assertRaisesRegex(deploy.DeploymentError, "no name or version"): self.activate("second", live)
 
     def test_guard_is_mandatory_and_reexec_has_no_bypass(self):
         with patch.object(deploy, "GUARD", str(self.root / "missing-guard")):

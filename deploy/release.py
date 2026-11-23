@@ -228,6 +228,18 @@ def dependency_file(name: str):
     return name in ("package.json", "package-lock.json") or name.startswith("node_modules/")
 
 
+def immutable_tree(target: Path):
+    """The files of a release the security autofix made: read-only, root-owned, no links. npm may leave a dependency's
+    command executable, so a file below node_modules/ may also be 0555."""
+    if target.is_symlink() or not target.is_dir(): raise DeploymentError("Autofix release is absent or not an immutable directory.")
+    for item in [target, *target.rglob("*")]:
+        relative = item.relative_to(target).as_posix()
+        modes = (0o555,) if item.is_dir() else (0o444, 0o555) if relative.startswith("node_modules/") else (0o444,)
+        if item.is_symlink() or item.stat().st_uid != os.geteuid() or stat.S_IMODE(item.stat().st_mode) not in modes:
+            raise DeploymentError("Autofix release ownership or immutable permissions changed.")
+    return artifact_files(target)
+
+
 def autofix_release(paths: Paths, release: str, recorded: str, required_hash: str):
     """Accept a current release that the security autofix made from the recorded one, and nothing else.
 
@@ -238,43 +250,65 @@ def autofix_release(paths: Paths, release: str, recorded: str, required_hash: st
         raise DeploymentError("Current MCP is neither the recorded release nor an autofix release; preserve and reconcile it.")
     base, manifest = verify_artifact(paths, recorded, required_hash)
     target = paths.releases / release
-    if target.is_symlink() or not target.is_dir(): raise DeploymentError("Autofix release is absent or not an immutable directory.")
-    for item in [target, *target.rglob("*")]:
-        if item.is_symlink() or item.stat().st_uid != os.geteuid() or stat.S_IMODE(item.stat().st_mode) != (0o555 if item.is_dir() else 0o444):
-            raise DeploymentError("Autofix release ownership or immutable permissions changed.")
-    files = artifact_files(target)
+    files = immutable_tree(target)
     own = lambda listing: {name: value for name, value in listing.items() if not dependency_file(name)}
     if own(files) != own(manifest["files"]) or (target / "release-manifest.json").read_bytes() != (base / "release-manifest.json").read_bytes():
         raise DeploymentError("Autofix release differs from the recorded release in more than its dependencies.")
-    described = lambda path: {key: value for key, value in json.loads((path / "package.json").read_text()).items() if key not in ("dependencies", "devDependencies", "overrides")}
+    described = lambda path: {key: value for key, value in json.loads((path / "package.json").read_text()).items() if key not in ("dependencies", "devDependencies", "optionalDependencies", "overrides")}
     if described(target) != described(base): raise DeploymentError("Autofix release changed package metadata other than its dependencies.")
-    return target, manifest, artifact_digest(files)
+    return artifact_digest(files)
 
 
 def recorded_release(paths: Paths, old, mcp: str, required_tree: str | None = None):
-    """Verify the running release against the recorded state. Returns its manifest, and its tree digest for an autofix release."""
+    """Verify the running release against the recorded state. Returns its tree digest when the autofix made it."""
     if old["release"] == mcp:
-        if required_tree is not None: raise DeploymentError("Recorded release kind changed; preserve and reconcile it.")
-        return verify_artifact(paths, mcp, old["artifact"])[1], None
-    _target, manifest, tree = autofix_release(paths, mcp, old["release"], old["artifact"])
+        verify_artifact(paths, mcp, old["artifact"])
+        return None
+    tree = autofix_release(paths, mcp, old["release"], old["artifact"])
     if required_tree is not None and tree != required_tree: raise DeploymentError("Autofix release changed after it was recorded; preserve and reconcile it.")
-    return manifest, tree
+    return tree
 
 
-def locked_versions(path: Path):
-    packages = json.loads((path / "package-lock.json").read_text()).get("packages", {})
-    return {name: entry.get("version", "") for name, entry in packages.items() if name and not entry.get("dev")}
+def recorded_tree(paths: Paths, release: str, tree: str):
+    """A return to an autofix release needs only that release, exactly as it was recorded: never the one it was made from."""
+    target = paths.releases / identifier(release)
+    if artifact_digest(immutable_tree(target)) != tree: raise DeploymentError("Autofix release changed after it was recorded; preserve and reconcile it.")
+    return json.loads((target / "release-manifest.json").read_text())
+
+
+def installed_versions(path: Path):
+    """Every installed copy of every package, by its own name, as its files say; a lockfile may say something else."""
+    found = {}
+    for item in path.rglob("package.json"):
+        parts = item.relative_to(path).parts[:-1]
+        if "node_modules" not in parts: continue
+        place = parts[len(parts) - parts[::-1].index("node_modules"):]
+        if len(place) != (2 if place and place[0].startswith("@") else 1): continue
+        package = json.loads(item.read_text())
+        if not isinstance(package.get("name"), str) or not isinstance(package.get("version"), str):
+            raise DeploymentError("An installed package has no name or version.")
+        found.setdefault(package["name"], set()).add(package["version"])
+    return found
+
+
+def version_key(version: str):
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?", version)
+    if not match: return None
+    label = tuple((0, int(part), "") if part.isdigit() else (1, 0, part) for part in match[4].split(".")) if match[4] else ()
+    return (*(int(match[n]) for n in (1, 2, 3)), 0 if match[4] else 1, label)
 
 
 def refuse_older_dependencies(running: Path, candidate: Path):
-    """An update must not bring back a dependency version older than the one the autofix installed."""
-    release = lambda version: tuple(int(part) for part in version.split(".")) if re.fullmatch(r"\d+\.\d+\.\d+", version) else None
-    new = locked_versions(candidate)
-    for name, version in locked_versions(running).items():
-        if name not in new or new[name] == version: continue
-        before, after = release(version), release(new[name])
-        if before is None or after is None or after < before:
-            raise DeploymentError("The update would install an older or unrecognized dependency version than the running release.")
+    """An update of an autofix release must not bring back a dependency older than the one the autofix installed.
+
+    The lowest installed copy counts on both sides, so an old copy nested anywhere in the update is seen."""
+    before, after = installed_versions(running), installed_versions(candidate)
+    if not before: raise DeploymentError("The running release's installed packages could not be read.")
+    for name in sorted(before.keys() & after.keys()):
+        if before[name] == after[name]: continue
+        old, new = [version_key(v) for v in before[name]], [version_key(v) for v in after[name]]
+        if None in old or None in new or min(new) < min(old):
+            raise DeploymentError(f"The update would install an older or unrecognized version of {name} than the running release.")
 
 
 class Host:
@@ -399,8 +433,8 @@ def prepare_candidate(paths: Paths, host: Host, release: str, artifact: str, web
         raise DeploymentError("Managed MCP files changed outside this release workflow; preserve and reconcile them.")
     tree = None
     if old:
-        _manifest, tree = recorded_release(paths, old, mcp)
-        refuse_older_dependencies(paths.releases / identifier(mcp), target)
+        tree = recorded_release(paths, old, mcp)
+        if tree is not None: refuse_older_dependencies(paths.releases / identifier(mcp), target)
     base_config = host.validate_caddy(paths.caddy)
     if not old_block and (DOMAIN in json.dumps(base_config) or "*.ipvolt.com" in json.dumps(base_config)):
         raise DeploymentError("Existing Caddy already handles the MCP hostname; manual reconciliation is required.")
@@ -469,9 +503,8 @@ def restore(paths: Paths, host: Host, record, automatic=False):
     if record["oldRelease"]:
         if not files["active"]: raise DeploymentError("Missing prior deployment state.")
         old_active = json.loads(base64.b64decode(files["active"]["data"]))
-        if old_active["release"] != record["oldRelease"] and not record.get("oldTree"):
-            raise DeploymentError("The prior release was not recorded with its tree; preserve and reconcile it.")
-        old_manifest, _tree = recorded_release(paths, old_active, record["oldRelease"], record.get("oldTree"))
+        if record.get("oldTree"): old_manifest = recorded_tree(paths, record["oldRelease"], record["oldTree"])
+        else: _target, old_manifest = verify_artifact(paths, record["oldRelease"], old_active["artifact"])
     live = regular(paths.caddy)
     if live is None: raise DeploymentError("Shared Caddy disappeared during rollback.")
     _before, live_block, _after = split_block(live)

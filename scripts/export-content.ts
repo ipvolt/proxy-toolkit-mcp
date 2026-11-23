@@ -4,8 +4,8 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // Maintainer-only build tool. This script is excluded from the npm artifact.
-const [sourceArg, release, scope] = process.argv.slice(2);
-if (!sourceArg || !release || !/^[a-zA-Z0-9][a-zA-Z0-9-]{0,79}$/.test(release) || (scope !== undefined && scope !== '--bundled-only')) {
+const [sourceArg, release, scope, ...extra] = process.argv.slice(2);
+if (!sourceArg || !release || !/^[a-zA-Z0-9][a-zA-Z0-9-]{0,79}$/.test(release) || (scope !== undefined && scope !== '--bundled-only') || extra.length) {
   throw new Error('Usage: tsx scripts/export-content.ts VERIFIED_WEBSITE_SOURCE REVIEWED_RELEASE [--bundled-only]');
 }
 const source = resolve(sourceArg);
@@ -34,6 +34,9 @@ const documents = entries.map(entry => {
   return {...entry, url: `https://ipvolt.com${entry.id}`, markdown, sha256: hash(markdown)};
 });
 if (new Set(documents.map(d => d.id)).size !== documents.length) throw new Error('Duplicate document');
+const dropped = bundled ? [...bundled].filter(id => !documents.some(d => d.id === id)).sort() : [];
+if (dropped.length) process.stderr.write(`No longer published, left out: ${dropped.join(', ')}\n`);
+if (!documents.length) throw new Error('No document left to export');
 const bundleSha256 = hash(JSON.stringify(documents));
 let generatedAt = new Date().toISOString();
 try {
