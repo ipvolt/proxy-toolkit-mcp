@@ -59,6 +59,10 @@ assert.equal(spoofed.nonce, nonce);
 for (const [path, status] of [['/healthz', 404], ['/unknown-verification-path', 404], ['/mcp', 405], ['/egress', 400]]) {
   await (await request(path, status, {}, path === '/mcp' || path === '/egress')).arrayBuffer();
 }
+const robots = await request('/robots.txt', 200);
+assert.match(robots.headers.get('content-type') ?? '', /^text\/plain/);
+assert.deepEqual((await robots.text()).split('\n').filter(line => line && !line.startsWith('#')),
+  ['User-agent: *', 'Content-Signal: search=yes, ai-input=yes, ai-train=yes', 'Allow: /']);
 const options = await request('/mcp', 204, { method: 'OPTIONS', headers: { Origin: 'https://ipvolt.com' } }, true);
 assert.equal(options.headers.get('access-control-allow-origin'), 'https://ipvolt.com');
 const foreign = await request('/mcp', 403, { method: 'OPTIONS', headers: { Origin: 'https://untrusted.example' } }, true);
@@ -67,7 +71,7 @@ await foreign.arrayBuffer();
 const report = {
   checkedAt: new Date().toISOString(), endpoint: endpoint.href, node: process.version,
   trustedPublicTls: true, localRouteToolAbsentAndRejected: true, results,
-  echoNonceVerified: true, forwardedPeerHeadersIgnored: true, privateHealthHidden: true,
+  echoNonceVerified: true, forwardedPeerHeadersIgnored: true, privateHealthHidden: true, robotsDeclared: true,
   methodAndCorsBoundariesVerified: true, noindexAndNoStoreVerified: true,
 };
 if (process.argv[2]) await writeFile(process.argv[2], JSON.stringify(report, null, 2) + '\n');

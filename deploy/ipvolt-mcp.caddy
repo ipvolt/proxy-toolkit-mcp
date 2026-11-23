@@ -27,6 +27,21 @@ mcp.ipvolt.com {
             }
         }
     }
+    # The crawl policy for this hostname. It serves protocol endpoints, not pages, so this is the only other path.
+    handle /robots.txt {
+        respond <<ROBOTS
+            # robots.txt for https://mcp.ipvolt.com
+            #
+            # ipvolt's Proxy Toolkit MCP server (/mcp). It has no pages; the documentation is at https://ipvolt.com/mcp.
+            # Crawl policy as on https://ipvolt.com/robots.txt: every crawler is welcome, AI crawlers included.
+            # Content Signals: https://contentsignals.org/
+
+            User-agent: *
+            Content-Signal: search=yes, ai-input=yes, ai-train=yes
+            Allow: /
+
+            ROBOTS 200
+    }
     handle {
         respond "Not found" 404
     }
