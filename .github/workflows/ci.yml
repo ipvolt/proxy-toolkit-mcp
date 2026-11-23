@@ -30,3 +30,4 @@ jobs:
       - run: python3 -m unittest discover -s registry/release -p 'test_*.py' -v
       - run: python3 -m unittest discover -s registry/account -p 'test_*.py' -v
       - run: node --import tsx --test registry/account/check-remote.test.mjs
+      - run: node --import tsx --test registry/hosted/check-remote.test.mjs

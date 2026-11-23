@@ -3,7 +3,7 @@
   "name": "io.github.ipvolt/proxy-toolkit",
   "title": "ipvolt Proxy Toolkit",
   "description": "Rent and manage ipvolt mobile proxies locally with an API key, or try a no-key sandbox; proxy docs.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "websiteUrl": "https://ipvolt.com",
   "repository": {
     "url": "https://github.com/ipvolt/proxy-toolkit-mcp",
@@ -14,7 +14,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@ipvolt/proxy-toolkit-mcp",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "runtimeHint": "npx",
       "transport": { "type": "stdio" },
       "environmentVariables": [

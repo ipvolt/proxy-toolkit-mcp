@@ -224,6 +224,105 @@ def verify_artifact(paths: Paths, release: str, required_hash: str):
     return target, manifest
 
 
+def dependency_file(name: str):
+    return name in ("package.json", "package-lock.json") or name.startswith("node_modules/")
+
+
+def immutable_tree(target: Path):
+    """The files of a release the security autofix made: read-only, root-owned, no links. npm may leave a dependency's
+    command executable, so a file below node_modules/ may also be 0555."""
+    if target.is_symlink() or not target.is_dir(): raise DeploymentError("Autofix release is absent or not an immutable directory.")
+    for item in [target, *target.rglob("*")]:
+        relative = item.relative_to(target).as_posix()
+        modes = (0o555,) if item.is_dir() else (0o444, 0o555) if relative.startswith("node_modules/") else (0o444,)
+        if item.is_symlink() or item.stat().st_uid != os.geteuid() or stat.S_IMODE(item.stat().st_mode) not in modes:
+            raise DeploymentError("Autofix release ownership or immutable permissions changed.")
+    return artifact_files(target)
+
+
+def tree_digest(target: Path, files):
+    """The files of a release, and its manifest, which artifact_files leaves out."""
+    return artifact_digest({**files, "release-manifest.json": digest((target / "release-manifest.json").read_bytes())})
+
+
+def autofix_release(paths: Paths, release: str, recorded: str, required_hash: str):
+    """Accept a current release that the security autofix made from the recorded one, and nothing else.
+
+    The autofix copies the live release, reinstalls its production dependencies and moves `current` without this
+    workflow, so the recorded state still names the release before it. That is accepted only while the recorded
+    artifact is intact and the running tree differs from it in dependency files alone."""
+    if not re.fullmatch(r"\d{8}-secfix-[a-z0-9-]+", identifier(release)):
+        raise DeploymentError("Current MCP is neither the recorded release nor an autofix release; preserve and reconcile it.")
+    base, manifest = verify_artifact(paths, recorded, required_hash)
+    target = paths.releases / release
+    files = immutable_tree(target)
+    own = lambda listing: {name: value for name, value in listing.items() if not dependency_file(name)}
+    if own(files) != own(manifest["files"]) or (target / "release-manifest.json").read_bytes() != (base / "release-manifest.json").read_bytes():
+        raise DeploymentError("Autofix release differs from the recorded release in more than its dependencies.")
+    described = lambda path: {key: value for key, value in json.loads((path / "package.json").read_text()).items() if key not in ("dependencies", "devDependencies", "optionalDependencies", "overrides")}
+    if described(target) != described(base): raise DeploymentError("Autofix release changed package metadata other than its dependencies.")
+    return tree_digest(target, files)
+
+
+def recorded_release(paths: Paths, old, mcp: str, required_tree: str | None = None):
+    """Verify the running release against the recorded state. Returns its tree digest when the autofix made it."""
+    if old["release"] == mcp:
+        verify_artifact(paths, mcp, old["artifact"])
+        return None
+    tree = autofix_release(paths, mcp, old["release"], old["artifact"])
+    if required_tree is not None and tree != required_tree: raise DeploymentError("Autofix release changed after it was recorded; preserve and reconcile it.")
+    return tree
+
+
+def recorded_tree(paths: Paths, release: str, tree: str):
+    """A return to an autofix release needs only that release, exactly as it was recorded: never the one it was made from."""
+    target = paths.releases / identifier(release)
+    if tree_digest(target, immutable_tree(target)) != tree: raise DeploymentError("Autofix release changed after it was recorded; preserve and reconcile it.")
+    return json.loads((target / "release-manifest.json").read_text())
+
+
+def installed_versions(path: Path):
+    """Every installed copy of every package, by its own name, as its files say; a lockfile may say something else."""
+    found = {}
+    for item in path.rglob("package.json"):
+        relative = item.relative_to(path)
+        parts = relative.parts[:-1]
+        if "node_modules" not in parts: continue
+        place = parts[len(parts) - parts[::-1].index("node_modules"):]
+        if len(place) != (2 if place and place[0].startswith("@") else 1): continue
+        try: package = json.loads(item.read_text())
+        except (OSError, ValueError, RecursionError): package = None
+        if not isinstance(package, dict) or not isinstance(package.get("name"), str) or not isinstance(package.get("version"), str):
+            raise DeploymentError(f"An installed package cannot be read: {relative.as_posix()}")
+        found.setdefault(package["name"], set()).add(package["version"])
+    return found
+
+
+def version_key(version: str):
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?", version)
+    if not match: return None
+    label = tuple((0, int(part), "") if part.isdigit() else (1, 0, part) for part in match[4].split(".")) if match[4] else ()
+    return (*(int(match[n]) for n in (1, 2, 3)), 0 if match[4] else 1, label)
+
+
+def refuse_older_dependencies(running: Path, candidate: Path):
+    """An update of an autofix release must not bring back a dependency older than the one the autofix installed.
+
+    Every installed copy of the update counts. One the running release does not have may not be below the highest copy
+    of its major line that it runs, or below the lowest copy it runs when it does not run that line. So an old copy
+    nested anywhere in the update is seen, and an unrelated old copy in the running release hides nothing."""
+    before, after = installed_versions(running), installed_versions(candidate)
+    if not before or not after: raise DeploymentError("The installed packages of the running release or the update could not be read.")
+    for name in sorted(before.keys() & after.keys()):
+        added = after[name] - before[name]
+        if not added: continue
+        old, new = [version_key(v) for v in before[name]], [version_key(v) for v in added]
+        for version in new:
+            same_line = [v for v in old if v is not None and version is not None and v[0] == version[0]]
+            if version is None or None in old or version < (max(same_line) if same_line else min(old)):
+                raise DeploymentError(f"The update would install an older or unrecognized version of {name} than the running release.")
+
+
 class Host:
     def run(self, args, check=True):
         result = subprocess.run(args, capture_output=True, text=True, env={"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"})
@@ -342,9 +441,12 @@ def prepare_candidate(paths: Paths, host: Host, release: str, artifact: str, web
     if mcp == "none":
         if old or old_block or regular(paths.unit) is not None or regular(paths.env) is not None or host.running() or host.enabled():
             raise DeploymentError("Unexpected existing MCP state; initial installation will not overwrite it.")
-    elif not old or old.get("release") != mcp or digest(old_block) != old["caddyBlockSha256"] or digest(regular(paths.unit) or b"") != old["unitSha256"] or digest(regular(paths.env) or b"") != old["envSha256"]:
+    elif not old or digest(old_block) != old["caddyBlockSha256"] or digest(regular(paths.unit) or b"") != old["unitSha256"] or digest(regular(paths.env) or b"") != old["envSha256"]:
         raise DeploymentError("Managed MCP files changed outside this release workflow; preserve and reconcile them.")
-    if old: verify_artifact(paths, mcp, old["artifact"])
+    tree = None
+    if old:
+        tree = recorded_release(paths, old, mcp)
+        if tree is not None: refuse_older_dependencies(paths.releases / identifier(mcp), target)
     base_config = host.validate_caddy(paths.caddy)
     if not old_block and (DOMAIN in json.dumps(base_config) or "*.ipvolt.com" in json.dumps(base_config)):
         raise DeploymentError("Existing Caddy already handles the MCP hostname; manual reconciliation is required.")
@@ -357,9 +459,10 @@ def prepare_candidate(paths: Paths, host: Host, release: str, artifact: str, web
     if address is not None: host.dns(address)
     host.account(); host.candidate(paths, target, unit, manifest)
     expected(paths, website, mcp); verify_artifact(paths, release, artifact)
+    if old: recorded_release(paths, old, mcp, tree)
     if regular(paths.caddy) != caddy or regular(paths.active) != active or regular(paths.unit) != initial_unit or regular(paths.env) != initial_env:
         raise DeploymentError("Shared configuration changed during candidate validation.")
-    return target, manifest, caddy, active, block, unit, env, new_caddy
+    return target, manifest, caddy, active, block, unit, env, new_caddy, tree
 
 
 def validate_candidate(paths: Paths, host: Host, release: str, artifact: str, website: str, mcp: str, node: str):
@@ -368,12 +471,12 @@ def validate_candidate(paths: Paths, host: Host, release: str, artifact: str, we
 
 
 def activate(paths: Paths, host: Host, release: str, artifact: str, website: str, mcp: str, node: str, address: str):
-    target, manifest, caddy, active, block, unit, env, new_caddy = prepare_candidate(paths, host, release, artifact, website, mcp, node, address)
+    target, manifest, caddy, active, block, unit, env, new_caddy, tree = prepare_candidate(paths, host, release, artifact, website, mcp, node, address)
     require_directory(paths.state, 0o700); require_directory(paths.state / "transactions", 0o700)
     transaction_id = identifier("mcp-" + release[:50] + "-" + str(time.time_ns()))
     transaction = paths.state / "transactions" / (transaction_id + ".json")
     if transaction.exists(): raise DeploymentError("Transaction already exists; retry with a distinct release identifier.")
-    record = {"id": transaction_id, "release": release, "oldRelease": None if mcp == "none" else mcp, "oldFiles": {"caddy": snapshot(paths.caddy), "unit": snapshot(paths.unit), "env": snapshot(paths.env), "active": snapshot(paths.active)}, "wasEnabled": host.enabled(), "wasRunning": host.running(), "newBlockSha256": digest(block), "newUnitSha256": digest(unit.encode()), "newEnvSha256": digest(env), "artifact": artifact}
+    record = {"id": transaction_id, "release": release, "oldRelease": None if mcp == "none" else mcp, "oldTree": tree, "oldFiles": {"caddy": snapshot(paths.caddy), "unit": snapshot(paths.unit), "env": snapshot(paths.env), "active": snapshot(paths.active)}, "wasEnabled": host.enabled(), "wasRunning": host.running(), "newBlockSha256": digest(block), "newUnitSha256": digest(unit.encode()), "newEnvSha256": digest(env), "artifact": artifact}
     atomic_file(transaction, (json.dumps(record, indent=2) + "\n").encode(), 0o600)
     try:
         atomic_file(paths.unit, unit.encode()); atomic_file(paths.env, env, 0o600)
@@ -412,7 +515,8 @@ def restore(paths: Paths, host: Host, record, automatic=False):
     if record["oldRelease"]:
         if not files["active"]: raise DeploymentError("Missing prior deployment state.")
         old_active = json.loads(base64.b64decode(files["active"]["data"]))
-        _target, old_manifest = verify_artifact(paths, record["oldRelease"], old_active["artifact"])
+        if record.get("oldTree"): old_manifest = recorded_tree(paths, record["oldRelease"], record["oldTree"])
+        else: _target, old_manifest = verify_artifact(paths, record["oldRelease"], old_active["artifact"])
     live = regular(paths.caddy)
     if live is None: raise DeploymentError("Shared Caddy disappeared during rollback.")
     _before, live_block, _after = split_block(live)
