@@ -10,7 +10,9 @@ export const SERVER_NAME = 'ipvolt-account';
 export const BASE_TOOLS = ['extend_rental', 'get_balance', 'get_rental', 'how_to_buy', 'list_rentals', 'list_stock', 'rent_proxy', 'rotate_ip'];
 // Listed by the server only while per-GB traffic is on sale.
 export const TRAFFIC_TOOLS = ['buy_traffic_pack', 'get_traffic_connection', 'list_traffic'];
-export const SPENDING_TOOLS = ['buy_traffic_pack', 'extend_rental', 'rent_proxy'];
+// Listed by the server only while it sells a proxy for an x402 payment without an account, and then always together.
+export const PURCHASE_TOOLS = ['buy_proxy', 'get_purchase'];
+export const SPENDING_TOOLS = ['buy_proxy', 'buy_traffic_pack', 'extend_rental', 'rent_proxy'];
 // A truthful client name: the site's edge refuses anonymous default clients.
 const USER_AGENT = 'ipvolt-registry-check/1 (+https://github.com/ipvolt/proxy-toolkit-mcp; MCP Registry publication check)';
 const failure = () => new Error('Public remote verification failed');
@@ -88,7 +90,9 @@ export async function checkRemote({ fetchImplementation = globalThis.fetch, envi
       const names = list.tools.map(tool => tool.name).sort();
       require(new Set(names).size === names.length);
       require(BASE_TOOLS.every(name => names.includes(name)));
-      require(names.every(name => BASE_TOOLS.includes(name) || TRAFFIC_TOOLS.includes(name)));
+      require(names.every(name => BASE_TOOLS.includes(name) || TRAFFIC_TOOLS.includes(name) || PURCHASE_TOOLS.includes(name)));
+      // The purchase is two tools or none: one without the other could not be finished, or could not be started.
+      require(PURCHASE_TOOLS.every(name => names.includes(name)) || !PURCHASE_TOOLS.some(name => names.includes(name)));
       for (const tool of list.tools) {
         require(tool.inputSchema?.type === 'object' && tool.inputSchema.additionalProperties === false);
         // A tool that spends must never be announced as read-only.

@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BASE_TOOLS, checkRemote, ENDPOINT, SPENDING_TOOLS, TRAFFIC_TOOLS, verifyEnvironment } from './check-remote.mjs';
+import { BASE_TOOLS, checkRemote, ENDPOINT, PURCHASE_TOOLS, SPENDING_TOOLS, TRAFFIC_TOOLS, verifyEnvironment } from './check-remote.mjs';
 
 // The account server's source is not in this repository, so a small stand-in answers as the reviewed server does:
 // JSON answers to POST, 202 to notifications, 405 to GET, tool errors (not HTTP errors) without a credential.
 function standIn(change = {}) {
   const calls = [];
-  const tools = (change.tools ?? [...BASE_TOOLS, ...TRAFFIC_TOOLS]).map(name => ({
+  const tools = (change.tools ?? [...BASE_TOOLS, ...TRAFFIC_TOOLS, ...PURCHASE_TOOLS]).map(name => ({
     name, description: name,
     inputSchema: { type: 'object', properties: {}, additionalProperties: change.looseSchema === name ? true : false },
-    annotations: { readOnlyHint: change.readOnly === name ? true : !SPENDING_TOOLS.includes(name) && name !== 'rotate_ip' },
+    annotations: { readOnlyHint: change.readOnly === name ? true : !SPENDING_TOOLS.includes(name) && name !== 'rotate_ip' && name !== 'get_purchase' },
   }));
   const result = value => ({ content: [{ type: 'text', text: JSON.stringify(value) }], structuredContent: value });
   const refusal = code => ({ ...result({ ok: false, summary: 'refused', error: { code } }), isError: true });
@@ -23,7 +23,7 @@ function standIn(change = {}) {
   const answer = message => {
     if (message.method === 'initialize') {
       return { protocolVersion: message.params.protocolVersion, capabilities: { tools: { listChanged: false } },
-               serverInfo: { name: change.serverName ?? 'ipvolt-account', version: change.serverVersion ?? '1.0.0' } };
+               serverInfo: { name: change.serverName ?? 'ipvolt-account', version: change.serverVersion ?? '1.1.0' } };
     }
     if (message.method === 'tools/list') return { tools };
     if (message.method === 'tools/call') return call(message.params.name);
@@ -54,14 +54,24 @@ const refused = /^Error: Public remote verification failed$/;
 test('the official client verifies the server, its tools and the four calls, without a credential', async () => {
   const server = standIn();
   const report = await checkRemote({ fetchImplementation: server.fetchImplementation });
-  assert.deepEqual(report, { ok: true, endpoint: ENDPOINT, protocol: '2025-11-25', serverName: 'ipvolt-account', serverVersion: '1.0.0',
-                             tools: [...BASE_TOOLS, ...TRAFFIC_TOOLS].sort(), toolCalls: 4 });
+  assert.deepEqual(report, { ok: true, endpoint: ENDPOINT, protocol: '2025-11-25', serverName: 'ipvolt-account', serverVersion: '1.1.0',
+                             tools: [...BASE_TOOLS, ...TRAFFIC_TOOLS, ...PURCHASE_TOOLS].sort(), toolCalls: 4 });
   assert.ok(server.calls.length >= 6 && server.calls.length <= 20);
 });
 
 test('the three traffic tools may be absent; the report lists what the server lists', async () => {
   const report = await checkRemote({ fetchImplementation: standIn({ tools: BASE_TOOLS }).fetchImplementation });
   assert.deepEqual(report.tools, [...BASE_TOOLS].sort());
+});
+
+test('the two purchase tools may be absent too, but never one without the other', async () => {
+  const without = await checkRemote({ fetchImplementation: standIn({ tools: [...BASE_TOOLS, ...TRAFFIC_TOOLS] }).fetchImplementation });
+  assert.deepEqual(without.tools, [...BASE_TOOLS, ...TRAFFIC_TOOLS].sort());
+  const only = await checkRemote({ fetchImplementation: standIn({ tools: [...BASE_TOOLS, ...PURCHASE_TOOLS] }).fetchImplementation });
+  assert.deepEqual(only.tools, [...BASE_TOOLS, ...PURCHASE_TOOLS].sort());
+  for (const name of PURCHASE_TOOLS) {
+    await assert.rejects(checkRemote({ fetchImplementation: standIn({ tools: [...BASE_TOOLS, name] }).fetchImplementation }), refused, name);
+  }
 });
 
 test('another server, version shape or tool catalog blocks publication', async () => {

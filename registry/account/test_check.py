@@ -13,7 +13,7 @@ check = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(check)
 
 OFFICIAL = "io.modelcontextprotocol.registry/official"
-TOOLS = sorted([*check.BASE_TOOLS, *check.TRAFFIC_TOOLS])
+TOOLS = sorted([*check.BASE_TOOLS, *check.TRAFFIC_TOOLS, *check.PURCHASE_TOOLS])
 
 
 class AccountChecks(unittest.TestCase):
@@ -219,6 +219,7 @@ class AccountChecks(unittest.TestCase):
             "an unreviewed tool": self.completed(self.report(tools=[*TOOLS, "delete_account"])),
             "a repeated tool": self.completed(self.report(tools=[*TOOLS, "list_stock"])),
             "tools not a list": self.completed(self.report(tools="list_stock")),
+            "one purchase tool without the other": self.completed(self.report(tools=[name for name in TOOLS if name != "get_purchase"])),
             "a failed child": self.completed(self.report(), returncode=1),
             "a noisy child": self.completed(self.report(), stderr=b"warning"),
             "not JSON": subprocess.CompletedProcess([], 0, b"ok", b""),
@@ -228,9 +229,10 @@ class AccountChecks(unittest.TestCase):
                 check.check_remote(self.version)
         with patch.object(check.subprocess, "run", side_effect=subprocess.TimeoutExpired("node", 75)), self.assertRaises(check.CheckError):
             check.check_remote(self.version)
-        # Without the traffic tools the server is still the reviewed one.
-        with patch.object(check.subprocess, "run", return_value=self.completed(self.report(tools=sorted(check.BASE_TOOLS)))):
-            check.check_remote(self.version)
+        # Without the traffic tools, or without the two purchase tools, the server is still the reviewed one.
+        for tools in (check.BASE_TOOLS, (*check.BASE_TOOLS, *check.TRAFFIC_TOOLS), (*check.BASE_TOOLS, *check.PURCHASE_TOOLS)):
+            with patch.object(check.subprocess, "run", return_value=self.completed(self.report(tools=sorted(tools)))):
+                check.check_remote(self.version)
 
     def run_main(self, action, **patches):
         defaults = {"check_local": MagicMock(return_value=self.manifest), "require_unpublished": MagicMock(),
