@@ -50,6 +50,8 @@ HEADER_FIXED = {"name": "Authorization", "placeholder": "Bearer YOUR_IPVOLT_API_
 BASE_TOOLS = ("extend_rental", "get_balance", "get_rental", "how_to_buy", "list_rentals", "list_stock", "rent_proxy",
               "rotate_ip")
 TRAFFIC_TOOLS = ("buy_traffic_pack", "get_traffic_connection", "list_traffic")
+# The two the server adds, together, while it sells a proxy for an x402 payment without an account.
+PURCHASE_TOOLS = ("buy_proxy", "get_purchase")
 # An entry of this publisher the Registry is known to hold. Reading it first proves the endpoint answers as
 # expected, so that a 404 for the new version means "not published" and not "the address changed".
 KNOWN_URL = "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.ipvolt%2Fproxy-toolkit/versions/0.1.1"
@@ -168,7 +170,8 @@ def check_remote(version):
     require(report.get("serverVersion") == version, "The remote reports another version than the entry")
     tools = report.get("tools")
     require(isinstance(tools, list) and all(isinstance(name, str) for name in tools) and len(set(tools)) == len(tools)
-            and set(BASE_TOOLS) <= set(tools) <= {*BASE_TOOLS, *TRAFFIC_TOOLS}, "The remote lists other tools than reviewed")
+            and set(BASE_TOOLS) <= set(tools) <= {*BASE_TOOLS, *TRAFFIC_TOOLS, *PURCHASE_TOOLS}
+            and len(set(PURCHASE_TOOLS) & set(tools)) in (0, len(PURCHASE_TOOLS)), "The remote lists other tools than reviewed")
     return report
 
 

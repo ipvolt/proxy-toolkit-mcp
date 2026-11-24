@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ipvolt/account",
   "title": "ipvolt account",
-  "description": "Mobile proxies on sale at ipvolt with prices; with an API key: balance, rent, extend, rotate IP.",
-  "version": "1.0.0",
+  "description": "Mobile proxies at ipvolt: prices and stock, buy with x402 (USDC), rent and rotate with an API key.",
+  "version": "1.1.0",
   "websiteUrl": "https://ipvolt.com/mcp",
   "remotes": [
     {
@@ -12,7 +12,7 @@
       "headers": [
         {
           "name": "Authorization",
-          "description": "Optional. What is on sale and its prices need no credential. For the account tools, set this to the word Bearer, a space and an ipvolt API key from your dashboard. Renting and extending spend the prepaid balance after a confirmation step; a read-only key cannot spend.",
+          "description": "Optional. What is on sale, its prices and buying a proxy with an x402 payment (buy_proxy) need no credential. For the account tools, set this to the word Bearer, a space and an ipvolt API key from your dashboard. Renting and extending spend the prepaid balance after a confirmation step; a read-only key cannot spend.",
           "placeholder": "Bearer YOUR_IPVOLT_API_KEY",
           "format": "string",
           "isRequired": false,
