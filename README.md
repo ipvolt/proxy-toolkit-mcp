@@ -1,5 +1,7 @@
 # ipvolt Proxy Toolkit
 
+[![ipvolt/proxy-toolkit-mcp MCP server](https://glama.ai/mcp/servers/ipvolt/proxy-toolkit-mcp/badges/score.svg)](https://glama.ai/mcp/servers/ipvolt/proxy-toolkit-mcp)
+
 An MCP server for finding reviewed proxy documentation, generating tested configuration examples and diagnosing structured proxy failures. The public tools run locally against a bundled catalog. They do not need an API key or access to an ipvolt proxy account.
 
 Without an API key, the toolkit does not provision proxies, spend money or access account data. With one, the optional [account tools](#account-tools-optional) let a local install rent and manage ipvolt mobile proxies paid from your prepaid balance. To try those tools before you have an account, start the server in [sandbox mode](#try-them-without-an-account-sandbox): the same tools on a simulated account, with no key and nothing charged. The toolkit never configures another agent's network route.
